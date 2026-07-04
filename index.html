@@ -184,14 +184,14 @@ select:focus { border-color: var(--verde); }
 
         <div class="group-title">Responsavel</div>
         <div class="dest-grid" id="grupo-resp" style="margin-bottom:1.4rem">
-          <div class="dest-card selected" data-valor="Gerliane" onclick="selecionarDest(this)">
-            <div class="dest-name">Gerliane</div><div class="dest-role">Eixo PTAC</div>
+          <div class="dest-card selected" data-valor="Gerliane Martins" onclick="selecionarDest(this)">
+            <div class="dest-name">Gerliane Martins</div><div class="dest-role">Eixo PTAC</div>
           </div>
-          <div class="dest-card" data-valor="Messias" onclick="selecionarDest(this)">
-            <div class="dest-name">Messias</div><div class="dest-role">Eixo Falencias</div>
+          <div class="dest-card" data-valor="Emanuel Sales" onclick="selecionarDest(this)">
+            <div class="dest-name">Emanuel Sales</div><div class="dest-role">Eixo Falencias</div>
           </div>
-          <div class="dest-card" data-valor="Leticia" onclick="selecionarDest(this)">
-            <div class="dest-name">Leticia</div><div class="dest-role">Eixo Inventarios</div>
+          <div class="dest-card" data-valor="Leticia Melo" onclick="selecionarDest(this)">
+            <div class="dest-name">Leticia Melo</div><div class="dest-role">Eixo Inventarios</div>
           </div>
         </div>
 
@@ -256,7 +256,7 @@ const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwJw85SQo2rFRpt
 let casos = [];
 let casoSelecionado = null;
 let eixoSelecionado = "PTAC";
-let respSelecionado = "Gerliane";
+let respSelecionado = "Gerliane Martins";
 
 function selecionarTag(grupo, el) {
   el.parentElement.querySelectorAll(".tag").forEach(t => t.classList.remove("selected"));
