@@ -274,7 +274,8 @@ async function api(acao, params) {
   const url = new URL(APPS_SCRIPT_URL);
   url.searchParams.set("acao", acao);
   Object.keys(params).forEach(k => url.searchParams.set(k, params[k]));
-  const resp = await fetch(url);
+  url.searchParams.set("_", Date.now());
+  const resp = await fetch(url, { cache: "no-store" });
   return resp.json();
 }
 
