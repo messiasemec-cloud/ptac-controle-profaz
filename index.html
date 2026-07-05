@@ -332,7 +332,7 @@ function renderBusca() {
     row.innerHTML = `
       <div class="avatar">${iniciais(c.Devedor)}</div>
       <div style="flex:1">
-        <div class="lista-nome">${c.Devedor}</div>
+        <div class="lista-nome">${c.Devedor}${c.Documento ? ` <span style="font-weight:400;color:var(--texto-sec);font-size:12px">- ${c.Documento}</span>` : ""}</div>
         <div class="lista-sub">${c.Eixo} · ${c.Responsavel}</div>
       </div>
       <span class="badge ${bc}">${c.Status}</span>`;
