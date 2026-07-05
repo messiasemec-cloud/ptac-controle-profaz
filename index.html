@@ -238,6 +238,9 @@ select:focus { border-color: var(--verde); }
         <div class="scorecard"><div class="scorecard-label">Eixo Falencia</div><div class="scorecard-valor verde" id="kpi-falencia">0</div><div class="scorecard-sub">casos identificados</div></div>
         <div class="scorecard"><div class="scorecard-label">Eixo Inventario</div><div class="scorecard-valor verde" id="kpi-inventario">0</div><div class="scorecard-sub">casos identificados</div></div>
       </div>
+      <div class="scorecards" style="grid-template-columns:1fr;margin-bottom:1rem">
+        <div class="scorecard"><div class="scorecard-label">Saldo total mapeado</div><div class="scorecard-valor azul" id="kpi-saldo-total">R$ 0</div><div class="scorecard-sub">soma de todas as execucoes e CDAs administrativas cadastradas</div></div>
+      </div>
       <div class="scorecards" style="grid-template-columns:repeat(2,1fr)">
         <div class="scorecard"><div class="scorecard-label">Itens aguardando oficio</div><div class="scorecard-valor laranja" id="kpi-oficio">0</div><div class="scorecard-sub">respostas pendentes</div></div>
         <div class="scorecard"><div class="scorecard-label">Saldo identificado p/ baixa</div><div class="scorecard-valor laranja" id="kpi-saldo-baixar">R$ 0</div><div class="scorecard-sub">confirmados como vendidos</div></div>
@@ -453,6 +456,7 @@ async function renderPainel() {
   document.getElementById("kpi-ptac").textContent = (painel.porEixo["PTAC"]||0);
   document.getElementById("kpi-falencia").textContent = (painel.porEixo["Falencia"]||0);
   document.getElementById("kpi-inventario").textContent = (painel.porEixo["Inventario"]||0);
+  document.getElementById("kpi-saldo-total").textContent = fmt(painel.saldoTotalMapeado);
   document.getElementById("kpi-oficio").textContent = painel.itensAguardandoOficio;
   document.getElementById("kpi-saldo-baixar").textContent = fmt(painel.saldoIdentificadoParaBaixa);
 
