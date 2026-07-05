@@ -382,7 +382,7 @@ async function renderFicha() {
             .map(s => `<option ${s===c.Status?"selected":""}>${s}</option>`).join("")}
         </select>
       </div>
-      <div class="group-title">Execucoes fiscais vinculadas (ordenadas por saldo)</div>
+      <div class="group-title">Execucoes fiscais vinculadas ao contribuinte</div>
       <div id="lista-bens-ficha"></div>
       <button class="btn-add-bem" onclick="adicionarBemFicha('${c.ID}')">+ Adicionar execucao fiscal</button>
     </div>`;
@@ -398,7 +398,10 @@ function renderBensFicha(c) {
     row.className = "bem-row";
     row.innerHTML = `
       <input type="text" value="${b.Matricula}" onchange="atualizarBem('${b.ID}','matricula',this.value)">
-      <input type="number" value="${b.Saldo}" onchange="atualizarBem('${b.ID}','saldo',this.value)">
+      <div style="display:flex;align-items:center;border:1.5px solid var(--cinza-borda);border-radius:var(--radius);overflow:hidden">
+        <span style="padding:0 8px;color:var(--texto-sec);font-size:13px;background:var(--cinza-bg);align-self:stretch;display:flex;align-items:center">R$</span>
+        <input type="number" value="${b.Saldo}" onchange="atualizarBem('${b.ID}','saldo',this.value)" style="border:none;border-radius:0">
+      </div>
       <select onchange="atualizarBem('${b.ID}','status',this.value)">
         <option value="verificar" ${b.Status==='verificar'?'selected':''}>A verificar</option>
         <option value="oficio" ${b.Status==='oficio'?'selected':''}>Oficio enviado - aguardando</option>
