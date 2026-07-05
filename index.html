@@ -382,9 +382,9 @@ async function renderFicha() {
             .map(s => `<option ${s===c.Status?"selected":""}>${s}</option>`).join("")}
         </select>
       </div>
-      <div class="group-title">Imoveis ou CDAs vinculados</div>
+      <div class="group-title">Execucoes fiscais vinculadas (ordenadas por saldo)</div>
       <div id="lista-bens-ficha"></div>
-      <button class="btn-add-bem" onclick="adicionarBemFicha('${c.ID}')">+ Adicionar imovel ou CDA</button>
+      <button class="btn-add-bem" onclick="adicionarBemFicha('${c.ID}')">+ Adicionar execucao fiscal</button>
     </div>`;
   renderBensFicha(c);
 }
@@ -392,7 +392,8 @@ async function renderFicha() {
 function renderBensFicha(c) {
   const lista = document.getElementById("lista-bens-ficha");
   lista.innerHTML = "";
-  (c.bens || []).forEach(b => {
+  const bensOrdenados = [...(c.bens || [])].sort((a, b) => Number(b.Saldo||0) - Number(a.Saldo||0));
+  bensOrdenados.forEach(b => {
     const row = document.createElement("div");
     row.className = "bem-row";
     row.innerHTML = `
@@ -410,7 +411,7 @@ function renderBensFicha(c) {
 }
 
 async function adicionarBemFicha(casoId) {
-  await api("adicionarBem", { casoId: casoId, matricula: "", saldo: 0, status: "verificar" });
+  await api("adicionarBem", { casoId: casoId, matricula: "Novo processo", saldo: 0, status: "verificar" });
   await carregarCasos();
   renderFicha();
 }
