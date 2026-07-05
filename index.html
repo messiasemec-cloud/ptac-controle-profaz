@@ -383,38 +383,53 @@ async function renderFicha() {
         </select>
       </div>
       <div class="group-title">Execucoes fiscais vinculadas ao contribuinte</div>
-      <div id="lista-bens-ficha"></div>
-      <button class="btn-add-bem" onclick="adicionarBemFicha('${c.ID}')">+ Adicionar execucao fiscal</button>
+      <div id="lista-exec-ficha"></div>
+      <button class="btn-add-bem" onclick="adicionarBemFicha('${c.ID}', 'execucao')">+ Adicionar execucao fiscal</button>
+
+      <div class="group-title" style="margin-top:1.5rem">CDAs em fase administrativa (sem execucao)</div>
+      <p style="font-size:12px;color:var(--texto-sec);margin:-4px 0 10px">Se ja existiu execucao (desjudicializada), registre o numero dela aqui - e a chave de pesquisa no PJe. So use o Ins.Adm quando nunca houve execucao.</p>
+      <div id="lista-adm-ficha"></div>
+      <button class="btn-add-bem" onclick="adicionarBemFicha('${c.ID}', 'administrativo')">+ Adicionar CDA administrativa</button>
     </div>`;
   renderBensFicha(c);
 }
 
-function renderBensFicha(c) {
-  const lista = document.getElementById("lista-bens-ficha");
-  lista.innerHTML = "";
-  const bensOrdenados = [...(c.bens || [])].sort((a, b) => Number(b.Saldo||0) - Number(a.Saldo||0));
-  bensOrdenados.forEach(b => {
-    const row = document.createElement("div");
-    row.className = "bem-row";
-    row.innerHTML = `
-      <input type="text" value="${b.Matricula}" onchange="atualizarBem('${b.ID}','matricula',this.value)">
-      <div style="display:flex;align-items:center;border:1.5px solid var(--cinza-borda);border-radius:var(--radius);overflow:hidden">
-        <span style="padding:0 8px;color:var(--texto-sec);font-size:13px;background:var(--cinza-bg);align-self:stretch;display:flex;align-items:center">R$</span>
-        <input type="number" value="${b.Saldo}" onchange="atualizarBem('${b.ID}','saldo',this.value)" style="border:none;border-radius:0">
-      </div>
-      <select onchange="atualizarBem('${b.ID}','status',this.value)">
-        <option value="verificar" ${b.Status==='verificar'?'selected':''}>A verificar</option>
-        <option value="oficio" ${b.Status==='oficio'?'selected':''}>Oficio enviado - aguardando</option>
-        <option value="confirmado" ${b.Status==='confirmado'?'selected':''}>Confirmado - e do devedor</option>
-        <option value="baixar" ${b.Status==='baixar'?'selected':''}>Vendido - baixar</option>
-      </select>
-      <button class="icon-btn" onclick="removerBem('${b.ID}')">&#128465;</button>`;
-    lista.appendChild(row);
-  });
+function renderLinhaBem(b) {
+  const row = document.createElement("div");
+  row.className = "bem-row";
+  row.innerHTML = `
+    <input type="text" value="${b.ExecucaoFiscal}" onchange="atualizarBem('${b.ID}','execucaoFiscal',this.value)">
+    <div style="display:flex;align-items:center;border:1.5px solid var(--cinza-borda);border-radius:var(--radius);overflow:hidden">
+      <span style="padding:0 8px;color:var(--texto-sec);font-size:13px;background:var(--cinza-bg);align-self:stretch;display:flex;align-items:center">R$</span>
+      <input type="number" value="${b.Saldo}" onchange="atualizarBem('${b.ID}','saldo',this.value)" style="border:none;border-radius:0">
+    </div>
+    <select onchange="atualizarBem('${b.ID}','status',this.value)">
+      <option value="verificar" ${b.Status==='verificar'?'selected':''}>A verificar</option>
+      <option value="oficio" ${b.Status==='oficio'?'selected':''}>Oficio enviado - aguardando</option>
+      <option value="confirmado" ${b.Status==='confirmado'?'selected':''}>Confirmado - e do devedor</option>
+      <option value="baixar" ${b.Status==='baixar'?'selected':''}>Vendido - baixar</option>
+    </select>
+    <button class="icon-btn" onclick="removerBem('${b.ID}')">&#128465;</button>`;
+  return row;
 }
 
-async function adicionarBemFicha(casoId) {
-  await api("adicionarBem", { casoId: casoId, matricula: "Novo processo", saldo: 0, status: "verificar" });
+function renderBensFicha(c) {
+  const todos = c.bens || [];
+  const execucoes = todos.filter(b => b.Tipo !== "administrativo").sort((a,b) => Number(b.Saldo||0) - Number(a.Saldo||0));
+  const administrativos = todos.filter(b => b.Tipo === "administrativo").sort((a,b) => Number(b.Saldo||0) - Number(a.Saldo||0));
+
+  const listaExec = document.getElementById("lista-exec-ficha");
+  listaExec.innerHTML = "";
+  execucoes.forEach(b => listaExec.appendChild(renderLinhaBem(b)));
+
+  const listaAdm = document.getElementById("lista-adm-ficha");
+  listaAdm.innerHTML = "";
+  administrativos.forEach(b => listaAdm.appendChild(renderLinhaBem(b)));
+}
+
+async function adicionarBemFicha(casoId, tipo) {
+  const rotulo = tipo === "administrativo" ? "Novo Ins.Adm" : "Novo processo";
+  await api("adicionarBem", { casoId: casoId, execucaoFiscal: rotulo, saldo: 0, status: "verificar", tipo: tipo });
   await carregarCasos();
   renderFicha();
 }
