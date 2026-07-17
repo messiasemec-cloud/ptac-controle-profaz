@@ -268,7 +268,7 @@ select:focus { border-color: var(--verde); }
         <div class="scorecard"><div class="scorecard-label">Eixo Inventario</div><div class="scorecard-valor verde" id="kpi-inventario">0</div><div class="scorecard-sub">casos cadastrados</div></div>
       </div>
       <div class="scorecards" style="grid-template-columns:1fr;margin-bottom:1rem">
-        <div class="scorecard"><div class="scorecard-label">Saldo total mapeado</div><div class="scorecard-valor azul" id="kpi-saldo-total">R$ 0</div><div class="scorecard-sub">soma de todas as execucoes e CDAs administrativas cadastradas</div></div>
+        <div class="scorecard"><div class="scorecard-label">Saldo total mapeado</div><div class="scorecard-valor azul" id="kpi-saldo-total">R$ 0</div><div class="scorecard-sub">soma de todas as execucoes e CDAs administrativas cadastradas</div><div id="barra-geral" style="margin-top:12px"></div></div>
       </div>
       <div class="scorecards" style="grid-template-columns:repeat(2,1fr)">
         <div class="scorecard"><div class="scorecard-label">Itens aguardando oficio</div><div class="scorecard-valor laranja" id="kpi-oficio">0</div><div class="scorecard-sub">respostas pendentes</div></div>
@@ -356,7 +356,8 @@ function segmentosPorValor(bens) {
   return { total, cinza, verde, vermelho };
 }
 
-function barraSegmentadaHtml(bens) {
+function barraSegmentadaHtml(bens, comLegenda) {
+  if (comLegenda === undefined) comLegenda = true;
   const { total, cinza, verde, vermelho } = segmentosPorValor(bens);
   if (total <= 0) return "";
   const pctVerde = verde/total*100;
@@ -368,11 +369,11 @@ function barraSegmentadaHtml(bens) {
       <div style="width:${pctVerde}%;background:var(--verde)"></div>
       <div style="width:${pctVermelho}%;background:#c0392b"></div>
     </div>
-    <div class="seg-legenda">
+    ${comLegenda ? `<div class="seg-legenda">
       <span><span class="seg-dot" style="background:#b7bcc2"></span>A verificar: ${fmt(cinza)}</span>
       <span><span class="seg-dot" style="background:var(--verde)"></span>Confirmado: ${fmt(verde)}</span>
       <span><span class="seg-dot" style="background:#c0392b"></span>Baixar: ${fmt(vermelho)}</span>
-    </div>`;
+    </div>` : ""}`;
 }
 
 function fmt(v) { return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
@@ -618,6 +619,8 @@ async function renderPainel() {
   document.getElementById("kpi-falencia").textContent = (painel.porEixo["Falencia"]||0);
   document.getElementById("kpi-inventario").textContent = (painel.porEixo["Inventario"]||0);
   document.getElementById("kpi-saldo-total").textContent = fmt(painel.saldoTotalMapeado);
+  const todosBens = painel.casos.flatMap(c => c.bens || []);
+  document.getElementById("barra-geral").innerHTML = barraSegmentadaHtml(todosBens, false);
   document.getElementById("kpi-oficio").textContent = painel.itensAguardandoOficio;
   document.getElementById("kpi-saldo-baixar").textContent = fmt(painel.saldoIdentificadoParaBaixa);
 
