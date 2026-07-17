@@ -412,10 +412,20 @@ function blocoInventarioFicha(c) {
     </div>
     <div class="field">
       <label>Valor estimado dos bens do espolio (R$)</label>
-      <input type="number" value="${c.ValorBensEspolio||''}" onchange="atualizarCasoInventario('${c.ID}','valorBensEspolio',this.value)">
+      <div style="display:flex;gap:8px">
+        <input type="number" id="valor-bens-${c.ID}" value="${c.ValorBensEspolio||''}" style="flex:1">
+        <button class="btn-buscar" style="width:auto;padding:10px 16px;white-space:nowrap" onclick="salvarValorBens('${c.ID}')">Salvar e comparar</button>
+      </div>
     </div>
     ${alerta}
   `;
+}
+
+async function salvarValorBens(id) {
+  const valor = document.getElementById("valor-bens-" + id).value;
+  await api("atualizarCasoInventario", { id: id, campo: "valorBensEspolio", valor: valor });
+  await carregarCasos();
+  renderFicha();
 }
 
 async function atualizarCasoInventario(id, campo, valor) {
