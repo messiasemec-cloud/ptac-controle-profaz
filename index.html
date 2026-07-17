@@ -268,11 +268,14 @@ select:focus { border-color: var(--verde); }
         <div class="scorecard"><div class="scorecard-label">Eixo Inventario</div><div class="scorecard-valor verde" id="kpi-inventario">0</div><div class="scorecard-sub">casos cadastrados</div></div>
       </div>
       <div class="scorecards" style="grid-template-columns:1fr;margin-bottom:1rem">
-        <div class="scorecard"><div class="scorecard-label">Saldo total mapeado</div><div class="scorecard-valor azul" id="kpi-saldo-total">R$ 0</div><div class="scorecard-sub">soma de todas as execucoes e CDAs administrativas cadastradas</div><div id="barra-geral" style="margin-top:12px"></div></div>
+        <div class="scorecard"><div class="scorecard-label">Saldo total mapeado</div><div class="scorecard-valor azul" id="kpi-saldo-total">R$ 0</div><div class="scorecard-sub">soma de todas as execucoes e CDAs administrativas cadastradas</div></div>
       </div>
-      <div class="scorecards" style="grid-template-columns:repeat(2,1fr)">
+      <div class="scorecards" style="grid-template-columns:repeat(2,1fr);margin-bottom:1rem">
         <div class="scorecard"><div class="scorecard-label">Itens aguardando oficio</div><div class="scorecard-valor laranja" id="kpi-oficio">0</div><div class="scorecard-sub">respostas pendentes</div></div>
         <div class="scorecard"><div class="scorecard-label">Saldo identificado p/ baixa</div><div class="scorecard-valor laranja" id="kpi-saldo-baixar">R$ 0</div><div class="scorecard-sub">confirmados como vendidos</div></div>
+      </div>
+      <div class="painel-card" style="margin-bottom:1.5rem;padding:1rem 1.5rem">
+        <div id="barra-geral"></div>
       </div>
       <div class="painel-card">
         <div class="painel-titulo">Progresso por devedor</div>
