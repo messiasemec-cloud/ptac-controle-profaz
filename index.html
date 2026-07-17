@@ -248,7 +248,7 @@ select:focus { border-color: var(--verde); }
       <div class="form-card">
         <div class="form-title">Buscar devedor</div>
         <div class="form-sub">Digite o nome para localizar o caso</div>
-        <input type="text" id="busca-devedor" placeholder="Ex: Orgal, Panorama..." oninput="renderBusca()">
+        <input type="text" id="busca-devedor" placeholder="Ex: Orgal, Panorama..." oninput="listaFocoId=null; renderBusca()">
         <div id="lista-busca" style="margin-top:12px"></div>
       </div>
       <div id="ficha-caso"></div>
@@ -355,14 +355,28 @@ const badgeClasse = {
   "Concluido/Extinto": "badge-concluido"
 };
 
+let listaFocoId = null;
+
 function renderBusca() {
   const termo = (document.getElementById("busca-devedor").value || "").toLowerCase();
   const lista = document.getElementById("lista-busca");
   lista.innerHTML = "";
-  casos.filter(c => c.Devedor.toLowerCase().includes(termo)).forEach(c => {
+
+  let visiveis = casos.filter(c => c.Devedor.toLowerCase().includes(termo));
+
+  if (listaFocoId !== null) {
+    visiveis = visiveis.filter(c => c.ID === listaFocoId);
+    const voltar = document.createElement("div");
+    voltar.style.cssText = "cursor:pointer;color:var(--verde);font-size:13px;font-weight:600;padding:4px 4px 12px;display:inline-block";
+    voltar.textContent = "← Ver todos";
+    voltar.onclick = (e) => { e.stopPropagation(); listaFocoId = null; renderBusca(); };
+    lista.appendChild(voltar);
+  }
+
+  visiveis.forEach(c => {
     const row = document.createElement("div");
     row.className = "lista-row";
-    row.onclick = () => { casoSelecionado = c.ID; renderFicha(); };
+    row.onclick = () => { casoSelecionado = c.ID; listaFocoId = c.ID; renderBusca(); renderFicha(); };
     const bc = badgeClasse[c.Status] || "badge-identificado";
     row.innerHTML = `
       <div class="avatar">${iniciais(c.Devedor)}</div>
@@ -373,6 +387,10 @@ function renderBusca() {
       <span class="badge ${bc}">${c.Status}</span>`;
     lista.appendChild(row);
   });
+
+  if (listaFocoId === null) {
+    document.getElementById("ficha-caso").innerHTML = "";
+  }
 }
 
 function blocoInventarioFicha(c) {
