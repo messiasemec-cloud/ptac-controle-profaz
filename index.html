@@ -45,6 +45,8 @@ body { font-family: 'Source Sans 3', sans-serif; background: var(--cinza-bg); co
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.4rem; }
 label { display: block; font-size: 12px; font-weight: 600; color: var(--texto-sec); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .04em; }
 input[type="text"], input[type="number"] { width: 100%; padding: 10px 14px; border: 1.5px solid var(--cinza-borda); border-radius: var(--radius); font-size: 15px; font-family: 'Source Sans 3', sans-serif; color: var(--texto); background: var(--branco); outline: none; transition: border-color .15s; }
+input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; }
 input:focus { border-color: var(--verde); box-shadow: 0 0 0 3px rgba(10,138,122,.1); }
 textarea { width: 100%; padding: 10px 14px; border: 1.5px solid var(--cinza-borda); border-radius: var(--radius); font-size: 15px; font-family: 'Source Sans 3', sans-serif; color: var(--texto); background: var(--branco); resize: vertical; min-height: 70px; outline: none; transition: border-color .15s; }
 textarea:focus { border-color: var(--verde); box-shadow: 0 0 0 3px rgba(10,138,122,.1); }
@@ -345,6 +347,22 @@ async function registrarCaso() {
 function fmt(v) { return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
 function iniciais(nome) { return (nome||"").split(" ").filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase(); }
 
+function parseValorBR(str) {
+  str = String(str || "").trim();
+  if (!str) return 0;
+  if (str.includes(",")) { str = str.replace(/\./g, "").replace(",", "."); }
+  return Number(str) || 0;
+}
+function entrarEdicaoValor(el, valorAtual) {
+  el.value = valorAtual;
+  el.select();
+}
+async function sairEdicaoValor(el, bemId) {
+  const novo = parseValorBR(el.value);
+  el.value = fmt(novo);
+  await atualizarBem(bemId, "saldo", novo);
+}
+
 const badgeClasse = {
   "Identificado": "badge-identificado",
   "Em analise": "badge-analise",
@@ -514,7 +532,7 @@ function renderLinhaBem(b) {
     <input type="text" value="${b.ExecucaoFiscal}" onchange="atualizarBem('${b.ID}','execucaoFiscal',this.value)">
     <div style="display:flex;align-items:center;border:1.5px solid var(--cinza-borda);border-radius:var(--radius);overflow:hidden">
       <span style="padding:0 8px;color:var(--texto-sec);font-size:13px;background:var(--cinza-bg);align-self:stretch;display:flex;align-items:center">R$</span>
-      <input type="number" value="${b.Saldo}" onchange="atualizarBem('${b.ID}','saldo',this.value)" style="border:none;border-radius:0">
+      <input type="text" value="${fmt(Number(b.Saldo)||0)}" onfocus="entrarEdicaoValor(this, ${Number(b.Saldo)||0})" onblur="sairEdicaoValor(this, '${b.ID}')" style="border:none;border-radius:0">
     </div>
     <select onchange="atualizarBem('${b.ID}','status',this.value)">
       <option value="verificar" ${b.Status==='verificar'?'selected':''}>A verificar</option>
