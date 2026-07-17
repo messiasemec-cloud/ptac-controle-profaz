@@ -214,6 +214,30 @@ select:focus { border-color: var(--verde); }
 
         <div class="field"><label>Observacoes</label><textarea id="f-obs"></textarea></div>
 
+        <div id="bloco-inventario" style="display:none">
+          <div class="group-title">Especifico do eixo Inventario</div>
+          <div class="field-row">
+            <div>
+              <label>Resultado da pesquisa</label>
+              <select id="f-resultado-pesquisa">
+                <option value="">Ainda nao pesquisado</option>
+                <option value="Em curso">Inventario em curso</option>
+                <option value="Finalizado">Inventario ja finalizado</option>
+                <option value="Nao localizado">Inventario nao localizado</option>
+              </select>
+            </div>
+            <div>
+              <label>Quem pesquisou primeiro</label>
+              <select id="f-quem-pesquisou">
+                <option value="">Nao definido</option>
+                <option value="Leticia">Leticia</option>
+                <option value="Procurador">Procurador</option>
+              </select>
+            </div>
+          </div>
+          <div class="field"><label>Valor estimado dos bens do espolio (R$)</label><input type="number" id="f-valor-bens" placeholder="0"></div>
+        </div>
+
         <button class="btn-submit" onclick="registrarCaso()">Registrar caso</button>
         <div class="feedback success" id="confirma-registro">Caso registrado. Ja aparece no andamento e no painel geral.</div>
       </div>
@@ -265,6 +289,7 @@ function selecionarTag(grupo, el) {
   el.parentElement.querySelectorAll(".tag").forEach(t => t.classList.remove("selected"));
   el.classList.add("selected");
   eixoSelecionado = el.dataset.valor;
+  document.getElementById("bloco-inventario").style.display = (eixoSelecionado === "Inventario") ? "block" : "none";
 }
 function selecionarDest(el) {
   el.parentElement.querySelectorAll(".dest-card").forEach(c => c.classList.remove("selected"));
@@ -304,9 +329,14 @@ async function registrarCaso() {
     tipo: document.getElementById("f-tipo").value,
     processo: document.getElementById("f-processo").value,
     saldo: document.getElementById("f-saldo").value || 0,
-    obs: document.getElementById("f-obs").value
+    obs: document.getElementById("f-obs").value,
+    resultadoPesquisa: document.getElementById("f-resultado-pesquisa").value,
+    quemPesquisou: document.getElementById("f-quem-pesquisou").value,
+    valorBensEspolio: document.getElementById("f-valor-bens").value || ""
   });
-  ["f-devedor","f-doc","f-processo","f-saldo","f-obs"].forEach(id => document.getElementById(id).value = "");
+  ["f-devedor","f-doc","f-processo","f-saldo","f-obs","f-valor-bens"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("f-resultado-pesquisa").value = "";
+  document.getElementById("f-quem-pesquisou").value = "";
   const conf = document.getElementById("confirma-registro");
   conf.style.display = "block";
   setTimeout(() => conf.style.display = "none", 3000);
@@ -318,6 +348,7 @@ function iniciais(nome) { return (nome||"").split(" ").filter(Boolean).slice(0,2
 const badgeClasse = {
   "Identificado": "badge-identificado",
   "Em analise": "badge-analise",
+  "Aguardando decisao do procurador": "badge-andamento",
   "Habilitacao em andamento": "badge-andamento",
   "Habilitado": "badge-habilitado",
   "Execucao suspensa": "badge-suspensa",
@@ -344,13 +375,60 @@ function renderBusca() {
   });
 }
 
+function blocoInventarioFicha(c) {
+  const bens = Number(c.ValorBensEspolio) || 0;
+  const divida = Number(c.SaldoDevedor) || 0;
+  const temComparacao = bens > 0 && divida > 0;
+  let alerta = "";
+  if (temComparacao) {
+    if (bens < divida) {
+      alerta = `<div style="background:#fdece3;color:#b0431a;padding:10px 14px;border-radius:var(--radius);font-size:13px;margin-top:10px">⚠️ Bens do espolio (${fmt(bens)}) sao menores que a divida (${fmt(divida)}) — candidato a PTAC mesmo com inventario em curso.</div>`;
+    } else {
+      alerta = `<div style="background:#e1f5ee;color:#076b5e;padding:10px 14px;border-radius:var(--radius);font-size:13px;margin-top:10px">✓ Bens do espolio (${fmt(bens)}) cobrem a divida (${fmt(divida)}) — habilitacao parece viavel.</div>`;
+    }
+  }
+  return `
+    <div class="group-title">Especifico do eixo Inventario</div>
+    <div class="field-row">
+      <div>
+        <label>Resultado da pesquisa</label>
+        <select onchange="atualizarCasoInventario('${c.ID}','resultadoPesquisa',this.value)">
+          <option value="" ${!c.ResultadoPesquisa?"selected":""}>Ainda nao pesquisado</option>
+          <option value="Em curso" ${c.ResultadoPesquisa==="Em curso"?"selected":""}>Inventario em curso</option>
+          <option value="Finalizado" ${c.ResultadoPesquisa==="Finalizado"?"selected":""}>Inventario ja finalizado</option>
+          <option value="Nao localizado" ${c.ResultadoPesquisa==="Nao localizado"?"selected":""}>Inventario nao localizado</option>
+        </select>
+      </div>
+      <div>
+        <label>Quem pesquisou primeiro</label>
+        <select onchange="atualizarCasoInventario('${c.ID}','quemPesquisou',this.value)">
+          <option value="" ${!c.QuemPesquisou?"selected":""}>Nao definido</option>
+          <option value="Leticia" ${c.QuemPesquisou==="Leticia"?"selected":""}>Leticia</option>
+          <option value="Procurador" ${c.QuemPesquisou==="Procurador"?"selected":""}>Procurador</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Valor estimado dos bens do espolio (R$)</label>
+      <input type="number" value="${c.ValorBensEspolio||''}" onchange="atualizarCasoInventario('${c.ID}','valorBensEspolio',this.value)">
+    </div>
+    ${alerta}
+  `;
+}
+
+async function atualizarCasoInventario(id, campo, valor) {
+  await api("atualizarCasoInventario", { id: id, campo: campo, valor: valor });
+  await carregarCasos();
+  renderFicha();
+}
+
 async function renderFicha() {
   const c = casos.find(x => String(x.ID) === String(casoSelecionado));
   const wrap = document.getElementById("ficha-caso");
   if (!c) { wrap.innerHTML = ""; return; }
   const passos = ["Identificado","Em analise","Habilitado","Concluido/Extinto"];
   const mapaPasso = {
-    "Identificado": 0, "Em analise": 1, "Habilitacao em andamento": 1,
+    "Identificado": 0, "Em analise": 1, "Aguardando decisao do procurador": 1, "Habilitacao em andamento": 1,
     "Habilitado": 2, "Execucao suspensa": 2, "Concluido/Extinto": 3
   };
   const passoAtual = mapaPasso[c.Status] ?? 0;
@@ -382,10 +460,11 @@ async function renderFicha() {
       <div class="field">
         <label>Status do caso</label>
         <select id="ficha-status" onchange="atualizarStatusCaso('${c.ID}', this.value)">
-          ${["Identificado","Em analise","Habilitacao em andamento","Habilitado","Execucao suspensa","Concluido/Extinto"]
+          ${["Identificado","Em analise","Aguardando decisao do procurador","Habilitacao em andamento","Habilitado","Execucao suspensa","Concluido/Extinto"]
             .map(s => `<option ${s===c.Status?"selected":""}>${s}</option>`).join("")}
         </select>
       </div>
+      ${c.Eixo === "Inventario" ? blocoInventarioFicha(c) : ""}
       <div class="group-title">Execucoes fiscais vinculadas ao contribuinte</div>
       <div id="lista-exec-ficha"></div>
       <button class="btn-add-bem" onclick="adicionarBemFicha('${c.ID}', 'execucao')">+ Adicionar execucao fiscal</button>
