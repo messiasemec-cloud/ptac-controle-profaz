@@ -377,15 +377,17 @@ function renderBusca() {
 
 function blocoInventarioFicha(c) {
   const bens = Number(c.ValorBensEspolio) || 0;
-  const divida = Number(c.SaldoDevedor) || 0;
+  const divida = (c.bens || []).reduce((s,x)=>s+(Number(x.Saldo)||0),0);
   const temComparacao = bens > 0 && divida > 0;
   let alerta = "";
   if (temComparacao) {
     if (bens < divida) {
-      alerta = `<div style="background:#fdece3;color:#b0431a;padding:10px 14px;border-radius:var(--radius);font-size:13px;margin-top:10px">⚠️ Bens do espolio (${fmt(bens)}) sao menores que a divida (${fmt(divida)}) — candidato a PTAC mesmo com inventario em curso.</div>`;
+      alerta = `<div style="background:#fdece3;color:#b0431a;padding:10px 14px;border-radius:var(--radius);font-size:13px;margin-top:10px">⚠️ Bens do espolio (${fmt(bens)}) sao menores que a divida mapeada (${fmt(divida)}) — candidato a PTAC mesmo com inventario em curso.</div>`;
     } else {
-      alerta = `<div style="background:#e1f5ee;color:#076b5e;padding:10px 14px;border-radius:var(--radius);font-size:13px;margin-top:10px">✓ Bens do espolio (${fmt(bens)}) cobrem a divida (${fmt(divida)}) — habilitacao parece viavel.</div>`;
+      alerta = `<div style="background:#e1f5ee;color:#076b5e;padding:10px 14px;border-radius:var(--radius);font-size:13px;margin-top:10px">✓ Bens do espolio (${fmt(bens)}) cobrem a divida mapeada (${fmt(divida)}) — habilitacao parece viavel.</div>`;
     }
+  } else if (bens > 0) {
+    alerta = `<div style="background:var(--cinza-bg);color:var(--texto-sec);padding:10px 14px;border-radius:var(--radius);font-size:13px;margin-top:10px">Valor salvo (${fmt(bens)}). Ainda nao ha execucoes/CDAs cadastradas nesta ficha para comparar.</div>`;
   }
   return `
     <div class="group-title">Especifico do eixo Inventario</div>
