@@ -255,6 +255,12 @@ select:focus { border-color: var(--verde); }
       <div class="form-card">
         <div class="form-title">Buscar devedor</div>
         <div class="form-sub">Digite o nome para localizar o caso</div>
+        <div id="filtro-eixo-andamento" style="display:flex;gap:8px;margin-bottom:12px">
+          <div class="tag selected" data-valor="" onclick="filtroEixoAndamento=this.dataset.valor; listaFocoId=null; document.querySelectorAll('#filtro-eixo-andamento .tag').forEach(t=>t.classList.remove('selected')); this.classList.add('selected'); renderBusca();">Todos</div>
+          <div class="tag" data-valor="PTAC" onclick="filtroEixoAndamento=this.dataset.valor; listaFocoId=null; document.querySelectorAll('#filtro-eixo-andamento .tag').forEach(t=>t.classList.remove('selected')); this.classList.add('selected'); renderBusca();">PTAC</div>
+          <div class="tag" data-valor="Falencia" onclick="filtroEixoAndamento=this.dataset.valor; listaFocoId=null; document.querySelectorAll('#filtro-eixo-andamento .tag').forEach(t=>t.classList.remove('selected')); this.classList.add('selected'); renderBusca();">Falencia</div>
+          <div class="tag" data-valor="Inventario" onclick="filtroEixoAndamento=this.dataset.valor; listaFocoId=null; document.querySelectorAll('#filtro-eixo-andamento .tag').forEach(t=>t.classList.remove('selected')); this.classList.add('selected'); renderBusca();">Inventario</div>
+        </div>
         <input type="text" id="busca-devedor" placeholder="Ex: Orgal, Panorama..." oninput="listaFocoId=null; renderBusca()">
         <div id="lista-busca" style="margin-top:12px"></div>
       </div>
@@ -416,6 +422,7 @@ const badgeClasse = {
 };
 
 let listaFocoId = null;
+let filtroEixoAndamento = "";
 
 function renderBusca() {
   const termo = (document.getElementById("busca-devedor").value || "").toLowerCase();
@@ -423,6 +430,7 @@ function renderBusca() {
   lista.innerHTML = "";
 
   let visiveis = casos.filter(c => c.Devedor.toLowerCase().includes(termo));
+  if (filtroEixoAndamento) visiveis = visiveis.filter(c => c.Eixo === filtroEixoAndamento);
 
   if (listaFocoId !== null) {
     visiveis = visiveis.filter(c => c.ID === listaFocoId);
