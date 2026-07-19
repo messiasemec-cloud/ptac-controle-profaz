@@ -137,6 +137,8 @@ select:focus { border-color: var(--verde); }
 .seg-bar { display: flex; width: 100%; height: 8px; border-radius: 4px; overflow: hidden; background: #d8dcdf; }
 .seg-legenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--texto-sec); margin-top: 6px; }
 .seg-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+.bem-row-fora { opacity: .5; }
+.bem-row-fora input, .bem-row-fora select { border-color: #d9a5a0 !important; background: #fdf5f4; }
 
 @media (max-width: 700px) {
   .field-row { grid-template-columns: 1fr; }
@@ -405,7 +407,12 @@ const badgeClasse = {
   "Habilitacao em andamento": "badge-andamento",
   "Habilitado": "badge-habilitado",
   "Execucao suspensa": "badge-suspensa",
-  "Concluido/Extinto": "badge-concluido"
+  "Concluido/Extinto": "badge-concluido",
+  "Pesquisando": "badge-analise",
+  "Encaminhado ao PTAC": "badge-suspensa",
+  "Aguardando deferimento da instauracao": "badge-andamento",
+  "Instaurado": "badge-habilitado",
+  "Recusado - retomado pelo procurador": "badge-suspensa"
 };
 
 let listaFocoId = null;
@@ -509,26 +516,31 @@ async function renderFicha() {
   const c = casos.find(x => String(x.ID) === String(casoSelecionado));
   const wrap = document.getElementById("ficha-caso");
   if (!c) { wrap.innerHTML = ""; return; }
-  const passos = ["Identificado","Em analise","Habilitado","Concluido/Extinto"];
-  const mapaPasso = {
-    "Identificado": 0, "Em analise": 1, "Aguardando decisao do procurador": 1, "Habilitacao em andamento": 1,
-    "Habilitado": 2, "Execucao suspensa": 2, "Concluido/Extinto": 3
-  };
-  const passoAtual = mapaPasso[c.Status] ?? 0;
+
+  // Fase: usa o campo Fase se ja existir na planilha; se nao existir ainda
+  // (dado antigo, migracao nao rodada), assume por convencao a partir do Eixo.
+  const fase = c.Fase || (c.Eixo === "PTAC" ? "PTAC" : "Triagem");
+
+  const STATUS_TRIAGEM = ["Identificado", "Pesquisando", "Habilitacao em andamento", "Habilitado", "Encaminhado ao PTAC"];
+  const STATUS_PTAC = ["Identificado", "Aguardando deferimento da instauracao", "Instaurado", "Recusado - retomado pelo procurador", "Concluido/Extinto"];
+  const listaStatus = fase === "PTAC" ? STATUS_PTAC : STATUS_TRIAGEM;
+  const passoAtual = Math.max(0, listaStatus.indexOf(c.Status));
 
   let tracker = '<div class="status-tracker">';
-  passos.forEach((nome, i) => {
+  listaStatus.forEach((nome, i) => {
     const estado = i < passoAtual ? "concluido" : (i === passoAtual ? "ativo" : "");
     tracker += `<div class="status-step">
       <div class="status-circle ${estado}">${i < passoAtual ? "&#10003;" : i+1}</div>
-      <div class="status-nome ${estado}">${nome.replace("Concluido/Extinto","Concluido")}</div>
+      <div class="status-nome ${estado}">${nome}</div>
     </div>`;
-    if (i < passos.length - 1) {
+    if (i < listaStatus.length - 1) {
       const estadoLinha = i < passoAtual ? "concluido" : "";
       tracker += `<div class="status-line ${estadoLinha}"></div>`;
     }
   });
   tracker += "</div>";
+
+  const podeEncaminharPtac = fase === "Triagem";
 
   wrap.innerHTML = `
     <div class="form-card">
@@ -537,16 +549,18 @@ async function renderFicha() {
           <div class="ficha-nome">${c.Devedor}</div>
           <div class="ficha-sub">${c.Documento||"sem documento"} · ${c.ProcessoReferencia||"sem processo vinculado"}</div>
         </div>
-        <span class="badge badge-habilitado">${c.Eixo}</span>
+        <div style="display:flex;gap:6px;align-items:flex-start">
+          <span class="badge badge-habilitado">${c.Eixo}</span>
+        </div>
       </div>
       ${tracker}
       <div class="field">
-        <label>Status do caso</label>
+        <label>Status do caso (${fase === "PTAC" ? "fluxo PTAC" : "triagem"})</label>
         <select id="ficha-status" onchange="atualizarStatusCaso('${c.ID}', this.value)">
-          ${["Identificado","Em analise","Aguardando decisao do procurador","Habilitacao em andamento","Habilitado","Execucao suspensa","Concluido/Extinto"]
-            .map(s => `<option ${s===c.Status?"selected":""}>${s}</option>`).join("")}
+          ${listaStatus.map(s => `<option ${s===c.Status?"selected":""}>${s}</option>`).join("")}
         </select>
       </div>
+      ${podeEncaminharPtac ? `<button class="btn-buscar" style="background:var(--laranja);margin-bottom:1rem" onclick="confirmarEncaminharPtac('${c.ID}','${c.Devedor.replace(/'/g,"\\'")}')">Encaminhar ao PTAC</button>` : ""}
       ${(c.bens && c.bens.length) ? `<div class="field"><label>Composicao do saldo devedor</label>${barraSegmentadaHtml(c.bens)}</div>` : ""}
       ${c.Eixo === "Inventario" ? blocoInventarioFicha(c) : ""}
       <div class="group-title">Execucoes fiscais vinculadas ao contribuinte</div>
@@ -561,9 +575,43 @@ async function renderFicha() {
   renderBensFicha(c);
 }
 
-function renderLinhaBem(b) {
+function melhorCombinacao(itensBens, patrimonio) {
+  const cap = Math.floor(Math.max(0, Number(patrimonio) || 0));
+  const lista = itensBens.map(b => ({ b: b, v: Math.round(Number(b.Saldo)||0) })).filter(x => x.v > 0);
+  const zerados = itensBens.filter(b => Math.round(Number(b.Saldo)||0) <= 0);
+  if (cap <= 0 || !lista.length) return null;
+
+  const LIMITE_DP = 3000000; // ~3M posicoes: seguro pro navegador
+  if (cap > LIMITE_DP) {
+    const ordenado = [...lista].sort((a,b) => a.v - b.v);
+    let soma = 0; const escolhidas = []; const sobra = [];
+    ordenado.forEach(x => { if (soma + x.v <= cap) { soma += x.v; escolhidas.push(x.b); } else sobra.push(x.b); });
+    return { escolhidas, sobra: [...sobra, ...zerados], soma, exato: false };
+  }
+
+  const dp = new Uint8Array(cap + 1);
+  const veio = new Int32Array(cap + 1).fill(-1);
+  dp[0] = 1;
+  for (let i = 0; i < lista.length; i++) {
+    const v = lista[i].v;
+    if (v > cap) continue;
+    for (let s = cap; s >= v; s--) {
+      if (dp[s - v] && !dp[s]) { dp[s] = 1; veio[s] = i; }
+    }
+  }
+  let melhorSoma = 0;
+  for (let s = cap; s >= 0; s--) { if (dp[s]) { melhorSoma = s; break; } }
+  let s = melhorSoma;
+  const idxEscolhidos = new Set();
+  while (s > 0 && veio[s] !== -1) { const idx = veio[s]; idxEscolhidos.add(idx); s -= lista[idx].v; }
+  const escolhidas = lista.filter((_, i) => idxEscolhidos.has(i)).map(x => x.b);
+  const sobra = lista.filter((_, i) => !idxEscolhidos.has(i)).map(x => x.b);
+  return { escolhidas, sobra: [...sobra, ...zerados], soma: melhorSoma, exato: true };
+}
+
+function renderLinhaBem(b, extraClass) {
   const row = document.createElement("div");
-  row.className = "bem-row";
+  row.className = "bem-row" + (extraClass ? " " + extraClass : "");
   row.innerHTML = `
     <input type="text" value="${b.ExecucaoFiscal}" onchange="atualizarBem('${b.ID}','execucaoFiscal',this.value)">
     <div style="display:flex;align-items:center;border:1.5px solid var(--cinza-borda);border-radius:var(--radius);overflow:hidden">
@@ -582,12 +630,34 @@ function renderLinhaBem(b) {
 
 function renderBensFicha(c) {
   const todos = c.bens || [];
-  const execucoes = todos.filter(b => b.Tipo !== "administrativo").sort((a,b) => Number(b.Saldo||0) - Number(a.Saldo||0));
+  const execucoesTodas = todos.filter(b => b.Tipo !== "administrativo");
   const administrativos = todos.filter(b => b.Tipo === "administrativo").sort((a,b) => Number(b.Saldo||0) - Number(a.Saldo||0));
 
   const listaExec = document.getElementById("lista-exec-ficha");
   listaExec.innerHTML = "";
-  execucoes.forEach(b => listaExec.appendChild(renderLinhaBem(b)));
+
+  const patrimonio = Number(c.ValorBensEspolio) || 0;
+  const combo = (c.Eixo === "Inventario" && patrimonio > 0) ? melhorCombinacao(execucoesTodas, patrimonio) : null;
+
+  if (combo) {
+    const legenda = document.createElement("div");
+    legenda.style.cssText = "font-size:12px;color:var(--texto-sec);margin-bottom:8px;line-height:1.5";
+    legenda.innerHTML = `Sugest&atilde;o de prioridade (menor &rarr; maior) que aproveita ao m&aacute;ximo o patrim&ocirc;nio estimado do esp&oacute;lio (${fmt(patrimonio)})${combo.exato ? "" : " &mdash; estimativa aproximada, valor alto demais para c&aacute;lculo exato"}. N&atilde;o exclui nenhuma execu&ccedil;&atilde;o da habilita&ccedil;&atilde;o, &eacute; s&oacute; ordem de trabalho.`;
+    listaExec.appendChild(legenda);
+
+    combo.escolhidas.sort((a,b) => Number(a.Saldo||0) - Number(b.Saldo||0)).forEach(b => listaExec.appendChild(renderLinhaBem(b)));
+
+    if (combo.sobra.length) {
+      const divisor = document.createElement("div");
+      divisor.style.cssText = "display:flex;align-items:center;gap:8px;margin:14px 0 10px;color:var(--texto-sec);font-size:11px;font-weight:600;letter-spacing:.03em;text-transform:uppercase";
+      divisor.innerHTML = `<span style="flex:1;height:1px;background:var(--cinza-borda)"></span>Fora da combina&ccedil;&atilde;o sugerida &mdash; n&atilde;o cabem no patrim&ocirc;nio estimado<span style="flex:1;height:1px;background:var(--cinza-borda)"></span>`;
+      listaExec.appendChild(divisor);
+
+      combo.sobra.sort((a,b) => Number(a.Saldo||0) - Number(b.Saldo||0)).forEach(b => listaExec.appendChild(renderLinhaBem(b, "bem-row-fora")));
+    }
+  } else {
+    execucoesTodas.sort((a,b) => Number(b.Saldo||0) - Number(a.Saldo||0)).forEach(b => listaExec.appendChild(renderLinhaBem(b)));
+  }
 
   const listaAdm = document.getElementById("lista-adm-ficha");
   listaAdm.innerHTML = "";
@@ -613,6 +683,16 @@ async function removerBem(bemId) {
 async function atualizarStatusCaso(casoId, status) {
   await api("atualizarStatusCaso", { id: casoId, status: status });
   await carregarCasos();
+  renderFicha();
+}
+
+async function confirmarEncaminharPtac(casoId, devedor) {
+  const ok = confirm(`Encaminhar "${devedor}" ao fluxo PTAC?\n\nO Eixo deste caso vai virar PTAC e o status reinicia em "Identificado" no fluxo do PTAC. Essa acao nao tem desfazer automatico.`);
+  if (!ok) return;
+  await api("encaminharAoPtac", { id: casoId });
+  await carregarCasos();
+  renderFicha();
+  renderBusca();
 }
 
 async function renderPainel() {
@@ -646,7 +726,9 @@ async function renderPainel() {
           <span style="font-weight:600;font-size:13px">${c.Devedor}</span>${c.Documento ? ` <span style="font-weight:400;color:var(--texto-sec);font-size:12px">- ${c.Documento}</span>` : ""}
           <span style="font-size:12px;color:var(--texto-sec);margin-left:6px">${c.Eixo}</span>
         </div>
-        <span class="badge ${bc}">${c.Status}</span>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="badge ${bc}">${c.Status}</span>
+        </div>
       </div>
       <div style="font-size:15px;font-weight:600;color:var(--verde-escuro);margin-bottom:6px">${total>0 ? fmt(saldoDevedor)+" · "+total+" itens" : "sem dado cadastrado"}</div>
       ${total>0 ? barraSegmentadaHtml(c.bens) : ""}`;
