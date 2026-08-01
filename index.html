@@ -168,16 +168,16 @@ select:focus { border-color: var(--verde); }
 
   <div class="abas-wrap">
     <div class="abas">
-      <button class="aba" id="nav-painel" onclick="mostrarPagina('painel')">Painel geral</button>
+      <button class="aba ativa" id="nav-painel" onclick="mostrarPagina('painel')">Painel geral</button>
       <button class="aba" id="nav-andamento" onclick="mostrarPagina('andamento')">Andamento</button>
-      <button class="aba ativa" id="nav-entrada" onclick="mostrarPagina('entrada')">Nova entrada</button>
+      <button class="aba" id="nav-entrada" onclick="mostrarPagina('entrada')">Nova entrada</button>
     </div>
   </div>
 
   <div class="container">
 
     <!-- PAGINA: NOVA ENTRADA -->
-    <div id="page-entrada" class="page active">
+    <div id="page-entrada" class="page">
       <div class="form-card">
         <div class="form-title">Registrar novo caso</div>
         <div class="form-sub">Preencha os dados do devedor para incluir no controle</div>
@@ -268,7 +268,7 @@ select:focus { border-color: var(--verde); }
     </div>
 
     <!-- PAGINA: PAINEL GERAL -->
-    <div id="page-painel" class="page">
+    <div id="page-painel" class="page active">
       <div class="scorecards">
         <div class="scorecard"><div class="scorecard-label">Total de casos</div><div class="scorecard-valor azul" id="kpi-total">0</div><div class="scorecard-sub">nos tres eixos</div></div>
         <div class="scorecard"><div class="scorecard-label">Eixo PTAC</div><div class="scorecard-valor verde" id="kpi-ptac">0</div><div class="scorecard-sub">casos cadastrados</div></div>
@@ -705,6 +705,11 @@ async function confirmarEncaminharPtac(casoId, devedor) {
   renderBusca();
 }
 
+function saldoCaso(c) {
+  if (c.bens && c.bens.length > 0) return c.bens.reduce((s,x)=>s+(Number(x.Saldo)||0),0);
+  return Number(c.SaldoDevedor) || 0;
+}
+
 async function renderPainel() {
   const painel = await api("painelGeral");
   document.getElementById("kpi-total").textContent = painel.totalCasos;
@@ -719,17 +724,24 @@ async function renderPainel() {
 
   const tabela = document.getElementById("tabela-painel");
   tabela.innerHTML = "";
-  const casosOrdenados = [...painel.casos].sort((a, b) => {
-    const saldoA = (a.bens||[]).reduce((s,x)=>s+(Number(x.Saldo)||0),0);
-    const saldoB = (b.bens||[]).reduce((s,x)=>s+(Number(x.Saldo)||0),0);
-    return saldoB - saldoA;
-  });
+  const casosOrdenados = [...painel.casos].sort((a, b) => saldoCaso(b) - saldoCaso(a));
   casosOrdenados.forEach(c => {
-    const total = (c.bens||[]).length;
-    const saldoDevedor = (c.bens||[]).reduce((s,x)=>s+(Number(x.Saldo)||0),0);
+    const detalhado = (c.bens||[]).length > 0;
+    const saldoDevedor = saldoCaso(c);
     const bc = badgeClasse[c.Status] || "badge-identificado";
     const row = document.createElement("div");
     row.className = "prog-row";
+    let linhaValor;
+    if (detalhado) {
+      linhaValor = `${fmt(saldoDevedor)} · ${c.bens.length} itens`;
+    } else if (saldoDevedor > 0) {
+      const partes = [fmt(saldoDevedor)];
+      if (c.NumeroCDAs) partes.push(`${c.NumeroCDAs} CDAs`);
+      if (c.NumeroExecucoesFiscais) partes.push(`${c.NumeroExecucoesFiscais} execucoes`);
+      linhaValor = partes.join(" · ");
+    } else {
+      linhaValor = "sem dado cadastrado";
+    }
     row.innerHTML = `
       <div class="prog-topo">
         <div>
@@ -740,11 +752,13 @@ async function renderPainel() {
           <span class="badge ${bc}">${c.Status}</span>
         </div>
       </div>
-      <div style="font-size:15px;font-weight:600;color:var(--verde-escuro);margin-bottom:6px">${total>0 ? fmt(saldoDevedor)+" · "+total+" itens" : "sem dado cadastrado"}</div>
-      ${total>0 ? barraSegmentadaHtml(c.bens) : ""}`;
+      <div style="font-size:15px;font-weight:600;color:var(--verde-escuro);margin-bottom:6px">${linhaValor}</div>
+      ${detalhado ? barraSegmentadaHtml(c.bens) : ""}`;
     tabela.appendChild(row);
   });
 }
+
+renderPainel();
 </script>
 </body>
 </html>
