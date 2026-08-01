@@ -414,11 +414,13 @@ const badgeClasse = {
   "Habilitado": "badge-habilitado",
   "Execucao suspensa": "badge-suspensa",
   "Concluido/Extinto": "badge-concluido",
+  "Concluido": "badge-concluido",
   "Pesquisando": "badge-analise",
   "Encaminhado ao PTAC": "badge-suspensa",
-  "Aguardando deferimento da instauracao": "badge-andamento",
   "Instaurado": "badge-habilitado",
-  "Recusado - retomado pelo procurador": "badge-suspensa"
+  "Oficio expedido a SEFIN": "badge-andamento",
+  "Elaboracao de parecer": "badge-andamento",
+  "Aprovacao pela chefia": "badge-andamento"
 };
 
 let listaFocoId = null;
@@ -530,7 +532,7 @@ async function renderFicha() {
   const fase = c.Fase || (c.Eixo === "PTAC" ? "PTAC" : "Triagem");
 
   const STATUS_TRIAGEM = ["Identificado", "Pesquisando", "Habilitacao em andamento", "Habilitado", "Encaminhado ao PTAC"];
-  const STATUS_PTAC = ["Identificado", "Aguardando deferimento da instauracao", "Instaurado", "Recusado - retomado pelo procurador", "Concluido/Extinto"];
+  const STATUS_PTAC = ["Instaurado", "Oficio expedido a SEFIN", "Elaboracao de parecer", "Aprovacao pela chefia", "Concluido"];
   const listaStatus = fase === "PTAC" ? STATUS_PTAC : STATUS_TRIAGEM;
   const passoAtual = Math.max(0, listaStatus.indexOf(c.Status));
 
@@ -695,7 +697,7 @@ async function atualizarStatusCaso(casoId, status) {
 }
 
 async function confirmarEncaminharPtac(casoId, devedor) {
-  const ok = confirm(`Encaminhar "${devedor}" ao fluxo PTAC?\n\nO Eixo deste caso vai virar PTAC e o status reinicia em "Identificado" no fluxo do PTAC. Essa acao nao tem desfazer automatico.`);
+  const ok = confirm(`Encaminhar "${devedor}" ao fluxo PTAC?\n\nO Eixo deste caso vai virar PTAC e o status vira "Instaurado" (a data de instauracao e gravada agora). Essa acao nao tem desfazer automatico.`);
   if (!ok) return;
   await api("encaminharAoPtac", { id: casoId });
   await carregarCasos();
