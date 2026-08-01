@@ -147,6 +147,7 @@ select:focus { border-color: var(--verde); }
   .form-card { padding: 1.25rem; }
 }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -571,6 +572,11 @@ async function renderFicha() {
         </select>
       </div>
       ${podeEncaminharPtac ? `<button class="btn-buscar" style="background:var(--laranja);margin-bottom:1rem" onclick="confirmarEncaminharPtac('${c.ID}','${c.Devedor.replace(/'/g,"\\'")}')">Encaminhar ao PTAC</button>` : ""}
+      <div class="field">
+        <label>Importar planilha de CDAs do Agilis (atualiza saldo, CDAs e execucoes deste devedor)</label>
+        <input type="file" id="upload-cdas-${c.ID}" accept=".xlsx" onchange="processarUploadCDAs(event, '${c.ID}')">
+        <div id="preview-upload-cdas" style="margin-top:8px;font-size:13px;color:var(--texto-sec)"></div>
+      </div>
       ${(c.bens && c.bens.length) ? `<div class="field"><label>Composicao do saldo devedor</label>${barraSegmentadaHtml(c.bens)}</div>` : ""}
       ${c.Eixo === "Inventario" ? blocoInventarioFicha(c) : ""}
       <div class="group-title">Execucoes fiscais vinculadas ao contribuinte</div>
@@ -690,6 +696,68 @@ async function removerBem(bemId) {
   await carregarCasos();
   renderFicha();
 }
+let importPendente = null;
+
+function processarUploadCDAs(event, casoId) {
+  const file = event.target.files[0];
+  const preview = document.getElementById("preview-upload-cdas");
+  if (!file) return;
+  preview.textContent = "Lendo planilha...";
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const linhas = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+      // Linhas 1-4 sao titulo/data de geracao/cabecalho; dados a partir da linha 5 (indice 4)
+      const dados = linhas.slice(4).filter(r => r[0] && String(r[0]).trim() !== "Total");
+
+      const cdaTemAtiva = {};
+      const processosAtivos = new Set();
+      let saldoTotal = 0;
+
+      dados.forEach(r => {
+        const numCda = String(r[0]).trim();
+        const processo = String(r[3] || "").trim();
+        const status = String(r[18] || "").trim();
+        if (!(numCda in cdaTemAtiva)) cdaTemAtiva[numCda] = false;
+        if (status === "Ativo") {
+          cdaTemAtiva[numCda] = true;
+          saldoTotal += Number(r[15]) || 0; // coluna P - Saldo Devedor (por exercicio, NAO usar a coluna Q que repete o total)
+          if (processo) processosAtivos.add(processo);
+        }
+      });
+
+      const numeroCDAs = Object.values(cdaTemAtiva).filter(v => v).length;
+      const numeroExecucoes = processosAtivos.size;
+
+      importPendente = { casoId, saldoTotal, numeroCDAs, numeroExecucoes };
+      preview.innerHTML = `Detectado: <b>${numeroCDAs} CDAs ativas</b> · <b>${numeroExecucoes} execucoes</b> · saldo <b>${fmt(saldoTotal)}</b>.
+        <button class="btn-submit" style="margin-top:8px;width:auto;padding:8px 16px" onclick="confirmarImportacaoCDAs()">Confirmar e salvar</button>`;
+    } catch (err) {
+      preview.textContent = "Erro ao ler o arquivo: " + err.message;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function confirmarImportacaoCDAs() {
+  if (!importPendente) return;
+  const preview = document.getElementById("preview-upload-cdas");
+  preview.textContent = "Salvando...";
+  await api("atualizarAgregadoCaso", {
+    id: importPendente.casoId,
+    saldo: importPendente.saldoTotal,
+    numeroCDAs: importPendente.numeroCDAs,
+    numeroExecucoes: importPendente.numeroExecucoes
+  });
+  importPendente = null;
+  await carregarCasos();
+  renderFicha();
+  renderBusca();
+}
+
 async function atualizarStatusCaso(casoId, status) {
   await api("atualizarStatusCaso", { id: casoId, status: status });
   await carregarCasos();
@@ -732,12 +800,13 @@ async function renderPainel() {
     const row = document.createElement("div");
     row.className = "prog-row";
     let linhaValor;
-    if (detalhado) {
-      linhaValor = `${fmt(saldoDevedor)} · ${c.bens.length} itens`;
-    } else if (saldoDevedor > 0) {
+    if (saldoDevedor > 0) {
       const partes = [fmt(saldoDevedor)];
-      if (c.NumeroCDAs) partes.push(`${c.NumeroCDAs} CDAs`);
-      if (c.NumeroExecucoesFiscais) partes.push(`${c.NumeroExecucoesFiscais} execucoes`);
+      const nCdas = c.NumeroCDAs || null;
+      const nExec = c.NumeroExecucoesFiscais || (detalhado ? c.bens.filter(b => b.Tipo === "execucao").length : null);
+      if (nExec) partes.push(`${nExec} execucoes`);
+      if (nCdas) partes.push(`${nCdas} CDAs`);
+      if (!nExec && !nCdas && detalhado) partes.push(`${c.bens.length} itens`);
       linhaValor = partes.join(" · ");
     } else {
       linhaValor = "sem dado cadastrado";
