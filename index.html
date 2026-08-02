@@ -615,7 +615,6 @@ async function renderFicha() {
         <input type="file" id="upload-cdas-${c.ID}" accept=".xlsx" onchange="processarUploadCDAs(event, '${c.ID}')">
         <div id="preview-upload-cdas" style="margin-top:8px;font-size:13px;color:var(--texto-sec)"></div>
       </div>
-      ${(c.bens && c.bens.length) ? `<div class="field"><label>Composicao do saldo devedor</label>${barraSegmentadaHtml(c.bens)}</div>` : ""}
       ${c.Eixo === "Inventario" ? blocoInventarioFicha(c) : ""}
       <div class="group-title">Execucoes fiscais vinculadas ao contribuinte</div>
       <div id="lista-exec-ficha"></div>
