@@ -119,7 +119,9 @@ select:focus { border-color: var(--verde); }
 /* SCORECARDS */
 .scorecards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 1.5rem; }
 .scorecard { background: var(--branco); border-radius: var(--radius-lg); border: 1px solid var(--cinza-borda); padding: 1.5rem; text-align: center; }
+.scorecard.compacto { padding: .85rem .75rem; }
 .scorecard-label { font-size: 12px; font-weight: 600; color: var(--texto-sec); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; }
+.scorecard.compacto .scorecard-label { font-size: 10.5px; margin-bottom: 4px; }
 .scorecard-valor { font-size: 40px; font-weight: 600; line-height: 1; }
 .scorecard-valor.pequeno { font-size: 20px; }
 .scorecard-valor.azul { color: var(--azul-escuro); }
@@ -272,21 +274,18 @@ select:focus { border-color: var(--verde); }
     <!-- PAGINA: PAINEL GERAL -->
     <div id="page-painel" class="page active">
       <div class="scorecards">
-        <div class="scorecard"><div class="scorecard-label">Total de casos</div><div class="scorecard-valor azul" id="kpi-total">0</div><div class="scorecard-sub">nos tres eixos</div></div>
-        <div class="scorecard"><div class="scorecard-label">Eixo PTAC</div><div class="scorecard-valor verde" id="kpi-ptac">0</div><div class="scorecard-sub">casos cadastrados</div></div>
-        <div class="scorecard"><div class="scorecard-label">Eixo Falencia</div><div class="scorecard-valor verde" id="kpi-falencia">0</div><div class="scorecard-sub">casos cadastrados</div></div>
-        <div class="scorecard"><div class="scorecard-label">Eixo Inventario</div><div class="scorecard-valor verde" id="kpi-inventario">0</div><div class="scorecard-sub">casos cadastrados</div></div>
-      </div>
-      <div class="scorecards" style="grid-template-columns:1fr;margin-bottom:1rem">
-        <div class="scorecard"><div class="scorecard-label">Saldo total mapeado</div><div class="scorecard-valor azul" id="kpi-saldo-total">R$ 0</div><div class="scorecard-sub">soma de todas as execucoes e CDAs administrativas cadastradas</div></div>
+        <div class="scorecard compacto"><div class="scorecard-label">Total de casos</div><div class="scorecard-valor azul" id="kpi-total">0</div><div class="scorecard-sub">nos tres eixos</div></div>
+        <div class="scorecard compacto"><div class="scorecard-label">Eixo PTAC</div><div class="scorecard-valor verde" id="kpi-ptac">0</div><div class="scorecard-sub">casos cadastrados</div></div>
+        <div class="scorecard compacto"><div class="scorecard-label">Eixo Falencia</div><div class="scorecard-valor verde" id="kpi-falencia">0</div><div class="scorecard-sub">casos cadastrados</div></div>
+        <div class="scorecard compacto"><div class="scorecard-label">Eixo Inventario</div><div class="scorecard-valor verde" id="kpi-inventario">0</div><div class="scorecard-sub">casos cadastrados</div></div>
       </div>
 
       <div class="painel-card" style="margin-bottom:1rem;padding:1.25rem 1.5rem">
         <div class="painel-titulo" style="margin-bottom:.75rem">Valor (saldo devedor) — fluxo PTAC</div>
         <div class="scorecards" style="grid-template-columns:repeat(3,1fr);margin-bottom:.75rem">
-          <div class="scorecard"><div class="scorecard-label">Sujeito a tratamento (em curso)</div><div class="scorecard-valor laranja pequeno" id="kpi-saldo-em-curso">R$ 0</div></div>
-          <div class="scorecard"><div class="scorecard-label">Tratamento adequado recebido</div><div class="scorecard-valor verde pequeno" id="kpi-saldo-concluido">R$ 0</div></div>
-          <div class="scorecard"><div class="scorecard-label">Total instaurado</div><div class="scorecard-valor azul pequeno" id="kpi-saldo-total-instaurado">R$ 0</div></div>
+          <div class="scorecard compacto"><div class="scorecard-label">Sujeito a tratamento (em curso)</div><div class="scorecard-valor laranja pequeno" id="kpi-saldo-em-curso">R$ 0</div></div>
+          <div class="scorecard compacto"><div class="scorecard-label">Tratamento adequado recebido</div><div class="scorecard-valor verde pequeno" id="kpi-saldo-concluido">R$ 0</div></div>
+          <div class="scorecard compacto"><div class="scorecard-label">Total instaurado</div><div class="scorecard-valor azul pequeno" id="kpi-saldo-total-instaurado">R$ 0</div></div>
         </div>
         <div id="barra-saldo"></div>
       </div>
@@ -294,9 +293,9 @@ select:focus { border-color: var(--verde); }
       <div class="painel-card" style="margin-bottom:1rem;padding:1.25rem 1.5rem">
         <div class="painel-titulo" style="margin-bottom:.75rem">Numero de execucoes fiscais — fluxo PTAC</div>
         <div class="scorecards" style="grid-template-columns:repeat(3,1fr);margin-bottom:.75rem">
-          <div class="scorecard"><div class="scorecard-label">Em curso</div><div class="scorecard-valor laranja pequeno" id="kpi-ef-em-curso">0</div></div>
-          <div class="scorecard"><div class="scorecard-label">Extintas (concluido)</div><div class="scorecard-valor verde pequeno" id="kpi-ef-concluido">0</div></div>
-          <div class="scorecard"><div class="scorecard-label">Total instaurado</div><div class="scorecard-valor azul pequeno" id="kpi-ef-total-instaurado">0</div></div>
+          <div class="scorecard compacto"><div class="scorecard-label">Em curso</div><div class="scorecard-valor laranja pequeno" id="kpi-ef-em-curso">0</div></div>
+          <div class="scorecard compacto"><div class="scorecard-label">Extintas (concluido)</div><div class="scorecard-valor verde pequeno" id="kpi-ef-concluido">0</div></div>
+          <div class="scorecard compacto"><div class="scorecard-label">Total instaurado</div><div class="scorecard-valor azul pequeno" id="kpi-ef-total-instaurado">0</div></div>
         </div>
         <div id="barra-ef"></div>
       </div>
@@ -304,9 +303,9 @@ select:focus { border-color: var(--verde); }
       <div class="painel-card" style="margin-bottom:1.5rem;padding:1.25rem 1.5rem">
         <div class="painel-titulo" style="margin-bottom:.75rem">Numero de CDAs — fluxo PTAC</div>
         <div class="scorecards" style="grid-template-columns:repeat(3,1fr);margin-bottom:.75rem">
-          <div class="scorecard"><div class="scorecard-label">Em curso</div><div class="scorecard-valor laranja pequeno" id="kpi-cdas-em-curso">0</div></div>
-          <div class="scorecard"><div class="scorecard-label">Concluido</div><div class="scorecard-valor verde pequeno" id="kpi-cdas-concluido">0</div></div>
-          <div class="scorecard"><div class="scorecard-label">Total instaurado</div><div class="scorecard-valor azul pequeno" id="kpi-cdas-total-instaurado">0</div></div>
+          <div class="scorecard compacto"><div class="scorecard-label">Em curso</div><div class="scorecard-valor laranja pequeno" id="kpi-cdas-em-curso">0</div></div>
+          <div class="scorecard compacto"><div class="scorecard-label">Concluido</div><div class="scorecard-valor verde pequeno" id="kpi-cdas-concluido">0</div></div>
+          <div class="scorecard compacto"><div class="scorecard-label">Total instaurado</div><div class="scorecard-valor azul pequeno" id="kpi-cdas-total-instaurado">0</div></div>
         </div>
         <div id="barra-cdas"></div>
       </div>
@@ -825,7 +824,6 @@ async function renderPainel() {
   document.getElementById("kpi-ptac").textContent = (painel.porEixo["PTAC"]||0);
   document.getElementById("kpi-falencia").textContent = (painel.porEixo["Falencia"]||0);
   document.getElementById("kpi-inventario").textContent = (painel.porEixo["Inventario"]||0);
-  document.getElementById("kpi-saldo-total").textContent = fmt(painel.saldoTotalMapeado);
 
   const numFmt = n => Number(n).toLocaleString('pt-BR');
 
