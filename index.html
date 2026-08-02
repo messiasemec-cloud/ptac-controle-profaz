@@ -801,12 +801,16 @@ async function confirmarImportacaoCDAs() {
   if (!importPendente) return;
   const preview = document.getElementById("preview-upload-cdas");
   preview.textContent = "Salvando...";
-  await api("atualizarAgregadoCaso", {
+  const resp = await api("atualizarAgregadoCaso", {
     id: importPendente.casoId,
     saldo: importPendente.saldoTotal,
     numeroCDAs: importPendente.numeroCDAs,
     numeroExecucoes: importPendente.numeroExecucoes
   });
+  if (resp && resp.erro) {
+    preview.innerHTML = `<span style="color:#c0392b">Erro ao salvar: ${resp.erro}</span>`;
+    return;
+  }
   importPendente = null;
   await carregarCasos();
   renderFicha();
@@ -824,12 +828,16 @@ async function salvarAgregadoManual(casoId) {
   const cdas = document.getElementById("manual-cdas-" + casoId).value;
   const preview = document.getElementById("preview-upload-cdas");
   preview.textContent = "Salvando...";
-  await api("atualizarAgregadoCaso", {
+  const resp = await api("atualizarAgregadoCaso", {
     id: casoId,
     saldo: saldo || 0,
     numeroCDAs: cdas || 0,
     numeroExecucoes: ef || 0
   });
+  if (resp && resp.erro) {
+    preview.innerHTML = `<span style="color:#c0392b">Erro ao salvar: ${resp.erro}</span>`;
+    return;
+  }
   await carregarCasos();
   renderFicha();
   renderBusca();
