@@ -826,8 +826,8 @@ function barraDuasCoresHtml(emCurso, concluido, formatarFn) {
       <div style="width:${pctConcluido}%;background:var(--verde)"></div>
     </div>
     <div class="seg-legenda">
-      <span><span class="seg-dot" style="background:var(--laranja)"></span>Em curso: ${formatarFn(emCurso)}</span>
-      <span><span class="seg-dot" style="background:var(--verde)"></span>Concluido: ${formatarFn(concluido)}</span>
+      <span><span class="seg-dot" style="background:var(--laranja)"></span>Em curso: ${formatarFn(emCurso)} · ${pctEmCurso.toFixed(1)}% do total</span>
+      <span><span class="seg-dot" style="background:var(--verde)"></span>Concluido: ${formatarFn(concluido)} · ${pctConcluido.toFixed(1)}% do total</span>
     </div>`;
 }
 
@@ -867,6 +867,7 @@ async function renderPainel() {
   const tabela = document.getElementById("tabela-painel");
   tabela.innerHTML = "";
   const casosOrdenados = [...painel.casos].sort((a, b) => saldoCaso(b) - saldoCaso(a));
+  const totalInstauradoGeral = painel.saldoEmCurso + painel.saldoConcluido;
   casosOrdenados.forEach(c => {
     const detalhado = (c.bens||[]).length > 0;
     const saldoDevedor = saldoCaso(c);
@@ -883,6 +884,10 @@ async function renderPainel() {
       if (nCdas) partes.push(`${nCdas} CDAs`);
       if (!nExec && !nCdas && detalhado) partes.push(`${c.bens.length} itens`);
       linhaValor = partes.join(" · ");
+      if (totalInstauradoGeral > 0) {
+        const pctDoTotal = (saldoDevedor / totalInstauradoGeral) * 100;
+        linhaValor += ` · ${pctDoTotal.toFixed(1)}% do total instaurado`;
+      }
     } else {
       linhaValor = "sem dado cadastrado";
     }
