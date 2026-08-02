@@ -279,13 +279,37 @@ select:focus { border-color: var(--verde); }
       <div class="scorecards" style="grid-template-columns:1fr;margin-bottom:1rem">
         <div class="scorecard"><div class="scorecard-label">Saldo total mapeado</div><div class="scorecard-valor azul" id="kpi-saldo-total">R$ 0</div><div class="scorecard-sub">soma de todas as execucoes e CDAs administrativas cadastradas</div></div>
       </div>
-      <div class="scorecards" style="grid-template-columns:repeat(2,1fr);margin-bottom:1rem">
-        <div class="scorecard"><div class="scorecard-label">Itens aguardando oficio</div><div class="scorecard-valor laranja" id="kpi-oficio">0</div><div class="scorecard-sub">respostas pendentes</div></div>
-        <div class="scorecard"><div class="scorecard-label">Saldo identificado p/ baixa</div><div class="scorecard-valor laranja" id="kpi-saldo-baixar">R$ 0</div><div class="scorecard-sub">confirmados como vendidos</div></div>
+
+      <div class="painel-card" style="margin-bottom:1rem;padding:1.25rem 1.5rem">
+        <div class="painel-titulo" style="margin-bottom:.75rem">Valor (saldo devedor) — fluxo PTAC</div>
+        <div class="scorecards" style="grid-template-columns:repeat(3,1fr);margin-bottom:.75rem">
+          <div class="scorecard"><div class="scorecard-label">Sujeito a tratamento (em curso)</div><div class="scorecard-valor laranja" id="kpi-saldo-em-curso">R$ 0</div></div>
+          <div class="scorecard"><div class="scorecard-label">Tratamento adequado recebido</div><div class="scorecard-valor verde" id="kpi-saldo-concluido">R$ 0</div></div>
+          <div class="scorecard"><div class="scorecard-label">Total instaurado</div><div class="scorecard-valor azul" id="kpi-saldo-total-instaurado">R$ 0</div></div>
+        </div>
+        <div id="barra-saldo"></div>
       </div>
-      <div class="painel-card" style="margin-bottom:1.5rem;padding:1rem 1.5rem">
-        <div id="barra-geral"></div>
+
+      <div class="painel-card" style="margin-bottom:1rem;padding:1.25rem 1.5rem">
+        <div class="painel-titulo" style="margin-bottom:.75rem">Numero de execucoes fiscais — fluxo PTAC</div>
+        <div class="scorecards" style="grid-template-columns:repeat(3,1fr);margin-bottom:.75rem">
+          <div class="scorecard"><div class="scorecard-label">Em curso</div><div class="scorecard-valor laranja" id="kpi-ef-em-curso">0</div></div>
+          <div class="scorecard"><div class="scorecard-label">Extintas (concluido)</div><div class="scorecard-valor verde" id="kpi-ef-concluido">0</div></div>
+          <div class="scorecard"><div class="scorecard-label">Total instaurado</div><div class="scorecard-valor azul" id="kpi-ef-total-instaurado">0</div></div>
+        </div>
+        <div id="barra-ef"></div>
       </div>
+
+      <div class="painel-card" style="margin-bottom:1.5rem;padding:1.25rem 1.5rem">
+        <div class="painel-titulo" style="margin-bottom:.75rem">Numero de CDAs — fluxo PTAC</div>
+        <div class="scorecards" style="grid-template-columns:repeat(3,1fr);margin-bottom:.75rem">
+          <div class="scorecard"><div class="scorecard-label">Em curso</div><div class="scorecard-valor laranja" id="kpi-cdas-em-curso">0</div></div>
+          <div class="scorecard"><div class="scorecard-label">Concluido</div><div class="scorecard-valor verde" id="kpi-cdas-concluido">0</div></div>
+          <div class="scorecard"><div class="scorecard-label">Total instaurado</div><div class="scorecard-valor azul" id="kpi-cdas-total-instaurado">0</div></div>
+        </div>
+        <div id="barra-cdas"></div>
+      </div>
+
       <div class="painel-card">
         <div class="painel-titulo">Progresso por devedor</div>
         <div id="tabela-painel"></div>
@@ -778,6 +802,22 @@ function saldoCaso(c) {
   return Number(c.SaldoDevedor) || 0;
 }
 
+function barraDuasCoresHtml(emCurso, concluido, formatarFn) {
+  const total = (Number(emCurso)||0) + (Number(concluido)||0);
+  if (total <= 0) return `<div style="font-size:12px;color:var(--texto-sec)">sem dado ainda</div>`;
+  const pctConcluido = concluido/total*100;
+  const pctEmCurso = Math.max(0, 100 - pctConcluido);
+  return `
+    <div class="seg-bar">
+      <div style="width:${pctEmCurso}%;background:var(--laranja)"></div>
+      <div style="width:${pctConcluido}%;background:var(--verde)"></div>
+    </div>
+    <div class="seg-legenda">
+      <span><span class="seg-dot" style="background:var(--laranja)"></span>Em curso: ${formatarFn(emCurso)}</span>
+      <span><span class="seg-dot" style="background:var(--verde)"></span>Concluido: ${formatarFn(concluido)}</span>
+    </div>`;
+}
+
 async function renderPainel() {
   const painel = await api("painelGeral");
   document.getElementById("kpi-total").textContent = painel.totalCasos;
@@ -785,10 +825,23 @@ async function renderPainel() {
   document.getElementById("kpi-falencia").textContent = (painel.porEixo["Falencia"]||0);
   document.getElementById("kpi-inventario").textContent = (painel.porEixo["Inventario"]||0);
   document.getElementById("kpi-saldo-total").textContent = fmt(painel.saldoTotalMapeado);
-  const todosBens = painel.casos.flatMap(c => c.bens || []);
-  document.getElementById("barra-geral").innerHTML = barraSegmentadaHtml(todosBens, false);
-  document.getElementById("kpi-oficio").textContent = painel.itensAguardandoOficio;
-  document.getElementById("kpi-saldo-baixar").textContent = fmt(painel.saldoIdentificadoParaBaixa);
+
+  const numFmt = n => Number(n).toLocaleString('pt-BR');
+
+  document.getElementById("kpi-saldo-em-curso").textContent = fmt(painel.saldoEmCurso);
+  document.getElementById("kpi-saldo-concluido").textContent = fmt(painel.saldoConcluido);
+  document.getElementById("kpi-saldo-total-instaurado").textContent = fmt(painel.saldoEmCurso + painel.saldoConcluido);
+  document.getElementById("barra-saldo").innerHTML = barraDuasCoresHtml(painel.saldoEmCurso, painel.saldoConcluido, fmt);
+
+  document.getElementById("kpi-ef-em-curso").textContent = numFmt(painel.efEmCurso);
+  document.getElementById("kpi-ef-concluido").textContent = numFmt(painel.efConcluido);
+  document.getElementById("kpi-ef-total-instaurado").textContent = numFmt(painel.efEmCurso + painel.efConcluido);
+  document.getElementById("barra-ef").innerHTML = barraDuasCoresHtml(painel.efEmCurso, painel.efConcluido, numFmt);
+
+  document.getElementById("kpi-cdas-em-curso").textContent = numFmt(painel.cdasEmCurso);
+  document.getElementById("kpi-cdas-concluido").textContent = numFmt(painel.cdasConcluido);
+  document.getElementById("kpi-cdas-total-instaurado").textContent = numFmt(painel.cdasEmCurso + painel.cdasConcluido);
+  document.getElementById("barra-cdas").innerHTML = barraDuasCoresHtml(painel.cdasEmCurso, painel.cdasConcluido, numFmt);
 
   const tabela = document.getElementById("tabela-painel");
   tabela.innerHTML = "";
