@@ -340,14 +340,25 @@ function selecionarDest(el) {
   respSelecionado = el.dataset.valor;
 }
 
-async function api(acao, params) {
+async function api(acao, params, tentativa) {
+  tentativa = tentativa || 1;
   params = params || {};
-  const url = new URL(APPS_SCRIPT_URL);
-  url.searchParams.set("acao", acao);
-  Object.keys(params).forEach(k => url.searchParams.set(k, params[k]));
-  url.searchParams.set("_", Date.now());
-  const resp = await fetch(url, { cache: "no-store" });
-  return resp.json();
+  const partes = ["acao=" + encodeURIComponent(acao)];
+  Object.keys(params).forEach(k => partes.push(k + "=" + encodeURIComponent(params[k])));
+  partes.push("_=" + Date.now());
+  const urlTexto = APPS_SCRIPT_URL + "?" + partes.join("&");
+  try {
+    const resp = await fetch(urlTexto, { cache: "no-store" });
+    const texto = await resp.text();
+    return JSON.parse(texto);
+  } catch (erro) {
+    if (tentativa < 4) {
+      await new Promise(r => setTimeout(r, 700 * tentativa)); // espera um pouco mais a cada tentativa
+      return api(acao, params, tentativa + 1);
+    }
+    console.error("Falha ao falar com o backend depois de 4 tentativas:", erro);
+    throw erro;
+  }
 }
 
 async function carregarCasos() { casos = await api("listarCasos"); }
