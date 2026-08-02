@@ -135,7 +135,7 @@ select:focus { border-color: var(--verde); }
 .prog-row { padding: 12px 10px; border-bottom: 1px solid var(--cinza-borda); border-left: 3px solid transparent; border-radius: 4px; }
 .prog-row:last-child { border-bottom: none; }
 .prog-row.concluido { border-left-color: var(--verde); background: #f1f9f6; }
-.selo-fase { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; color: #fff; white-space: nowrap; }
+.selo-fase { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .prog-topo { display: flex; justify-content: space-between; margin-bottom: 8px; }
 .bbg { width: 100%; height: 6px; border-radius: 3px; background: var(--cinza-borda); overflow: hidden; }
 .bfill { height: 100%; border-radius: 3px; background: var(--verde); }
@@ -821,12 +821,12 @@ function barraDuasCoresHtml(emCurso, concluido, formatarFn) {
 }
 
 const corPorFasePTAC = {
-  "Instaurado": "#c0392b",
-  "Oficio expedido a SEFIN": "#e05020",
-  "Elaboracao de parecer": "#d4a017",
-  "Aprovacao pela chefia": "#8bc34a",
-  "Concluido": "#0a8a7a",
-  "Concluido/Extinto": "#0a8a7a"
+  "Instaurado": { bg: "#fdecea", texto: "#c0392b" },
+  "Oficio expedido a SEFIN": { bg: "#fdeee2", texto: "#b8541f" },
+  "Elaboracao de parecer": { bg: "#fdf3d8", texto: "#9a7207" },
+  "Aprovacao pela chefia": { bg: "#eef7e0", texto: "#5a8f2e" },
+  "Concluido": { bg: "#e1f5ee", texto: "#076b5e" },
+  "Concluido/Extinto": { bg: "#e1f5ee", texto: "#076b5e" }
 };
 
 async function renderPainel() {
@@ -876,7 +876,7 @@ async function renderPainel() {
       linhaValor = "sem dado cadastrado";
     }
     const selo = corFase
-      ? `<span class="selo-fase" style="background:${corFase}">${c.Status}</span>`
+      ? `<span class="selo-fase" style="background:${corFase.bg};color:${corFase.texto}">${c.Status}</span>`
       : `<span class="badge ${badgeClasse[c.Status] || "badge-identificado"}">${c.Status}</span>`;
     row.innerHTML = `
       <div class="prog-topo">
