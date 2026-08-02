@@ -121,6 +121,7 @@ select:focus { border-color: var(--verde); }
 .scorecard { background: var(--branco); border-radius: var(--radius-lg); border: 1px solid var(--cinza-borda); padding: 1.5rem; text-align: center; }
 .scorecard-label { font-size: 12px; font-weight: 600; color: var(--texto-sec); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; }
 .scorecard-valor { font-size: 40px; font-weight: 600; line-height: 1; }
+.scorecard-valor.pequeno { font-size: 20px; }
 .scorecard-valor.azul { color: var(--azul-escuro); }
 .scorecard-valor.verde { color: var(--verde); }
 .scorecard-valor.laranja { color: var(--laranja); }
@@ -283,9 +284,9 @@ select:focus { border-color: var(--verde); }
       <div class="painel-card" style="margin-bottom:1rem;padding:1.25rem 1.5rem">
         <div class="painel-titulo" style="margin-bottom:.75rem">Valor (saldo devedor) — fluxo PTAC</div>
         <div class="scorecards" style="grid-template-columns:repeat(3,1fr);margin-bottom:.75rem">
-          <div class="scorecard"><div class="scorecard-label">Sujeito a tratamento (em curso)</div><div class="scorecard-valor laranja" id="kpi-saldo-em-curso">R$ 0</div></div>
-          <div class="scorecard"><div class="scorecard-label">Tratamento adequado recebido</div><div class="scorecard-valor verde" id="kpi-saldo-concluido">R$ 0</div></div>
-          <div class="scorecard"><div class="scorecard-label">Total instaurado</div><div class="scorecard-valor azul" id="kpi-saldo-total-instaurado">R$ 0</div></div>
+          <div class="scorecard"><div class="scorecard-label">Sujeito a tratamento (em curso)</div><div class="scorecard-valor laranja pequeno" id="kpi-saldo-em-curso">R$ 0</div></div>
+          <div class="scorecard"><div class="scorecard-label">Tratamento adequado recebido</div><div class="scorecard-valor verde pequeno" id="kpi-saldo-concluido">R$ 0</div></div>
+          <div class="scorecard"><div class="scorecard-label">Total instaurado</div><div class="scorecard-valor azul pequeno" id="kpi-saldo-total-instaurado">R$ 0</div></div>
         </div>
         <div id="barra-saldo"></div>
       </div>
@@ -293,9 +294,9 @@ select:focus { border-color: var(--verde); }
       <div class="painel-card" style="margin-bottom:1rem;padding:1.25rem 1.5rem">
         <div class="painel-titulo" style="margin-bottom:.75rem">Numero de execucoes fiscais — fluxo PTAC</div>
         <div class="scorecards" style="grid-template-columns:repeat(3,1fr);margin-bottom:.75rem">
-          <div class="scorecard"><div class="scorecard-label">Em curso</div><div class="scorecard-valor laranja" id="kpi-ef-em-curso">0</div></div>
-          <div class="scorecard"><div class="scorecard-label">Extintas (concluido)</div><div class="scorecard-valor verde" id="kpi-ef-concluido">0</div></div>
-          <div class="scorecard"><div class="scorecard-label">Total instaurado</div><div class="scorecard-valor azul" id="kpi-ef-total-instaurado">0</div></div>
+          <div class="scorecard"><div class="scorecard-label">Em curso</div><div class="scorecard-valor laranja pequeno" id="kpi-ef-em-curso">0</div></div>
+          <div class="scorecard"><div class="scorecard-label">Extintas (concluido)</div><div class="scorecard-valor verde pequeno" id="kpi-ef-concluido">0</div></div>
+          <div class="scorecard"><div class="scorecard-label">Total instaurado</div><div class="scorecard-valor azul pequeno" id="kpi-ef-total-instaurado">0</div></div>
         </div>
         <div id="barra-ef"></div>
       </div>
@@ -303,9 +304,9 @@ select:focus { border-color: var(--verde); }
       <div class="painel-card" style="margin-bottom:1.5rem;padding:1.25rem 1.5rem">
         <div class="painel-titulo" style="margin-bottom:.75rem">Numero de CDAs — fluxo PTAC</div>
         <div class="scorecards" style="grid-template-columns:repeat(3,1fr);margin-bottom:.75rem">
-          <div class="scorecard"><div class="scorecard-label">Em curso</div><div class="scorecard-valor laranja" id="kpi-cdas-em-curso">0</div></div>
-          <div class="scorecard"><div class="scorecard-label">Concluido</div><div class="scorecard-valor verde" id="kpi-cdas-concluido">0</div></div>
-          <div class="scorecard"><div class="scorecard-label">Total instaurado</div><div class="scorecard-valor azul" id="kpi-cdas-total-instaurado">0</div></div>
+          <div class="scorecard"><div class="scorecard-label">Em curso</div><div class="scorecard-valor laranja pequeno" id="kpi-cdas-em-curso">0</div></div>
+          <div class="scorecard"><div class="scorecard-label">Concluido</div><div class="scorecard-valor verde pequeno" id="kpi-cdas-concluido">0</div></div>
+          <div class="scorecard"><div class="scorecard-label">Total instaurado</div><div class="scorecard-valor azul pequeno" id="kpi-cdas-total-instaurado">0</div></div>
         </div>
         <div id="barra-cdas"></div>
       </div>
