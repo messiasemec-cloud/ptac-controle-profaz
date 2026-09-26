@@ -268,31 +268,35 @@ select:focus { border-color: var(--verde); }
 
     <!-- PAGINA: PAINEL GERAL -->
     <div id="page-painel" class="page active">
-      <div class="scorecards">
+      <div class="scorecards" style="grid-template-columns:1fr;margin-bottom:1rem">
         <div class="scorecard compacto"><div class="scorecard-label">Total</div><div class="scorecard-valor azul pequeno" id="kpi-total">0</div><div class="scorecard-sub">casos cadastrados</div></div>
-        <div class="scorecard compacto"><div class="scorecard-label">Processos instaurados</div><div class="scorecard-valor azul pequeno" id="kpi-ptac">0</div><div class="scorecard-sub">ja passaram pela instauracao</div></div>
-        <div class="scorecard compacto"><div class="scorecard-label">Processos em curso</div><div class="scorecard-valor laranja pequeno" id="kpi-falencia">0</div><div class="scorecard-sub">ainda nao concluidos</div></div>
-        <div class="scorecard compacto"><div class="scorecard-label">Processos concluidos</div><div class="scorecard-valor verde pequeno" id="kpi-inventario">0</div><div class="scorecard-sub">tratamento adequado recebido</div></div>
       </div>
 
       <div class="painel-card" style="margin-bottom:1rem;padding:1.25rem 1.5rem">
-        <div class="painel-titulo" style="margin-bottom:.75rem">Valor (saldo devedor) — fluxo PTAC</div>
-        <div class="scorecards" style="grid-template-columns:repeat(3,1fr);margin-bottom:.75rem">
-          <div class="scorecard compacto"><div class="scorecard-label">Sujeito a tratamento (em curso)</div><div class="scorecard-valor laranja pequeno" id="kpi-saldo-em-curso">R$ 0</div></div>
-          <div class="scorecard compacto"><div class="scorecard-label">Tratamento adequado recebido</div><div class="scorecard-valor verde pequeno" id="kpi-saldo-concluido">R$ 0</div></div>
-          <div class="scorecard compacto"><div class="scorecard-label">Total instaurado</div><div class="scorecard-valor azul pequeno" id="kpi-saldo-total-instaurado">R$ 0</div></div>
+        <div class="painel-titulo" style="margin-bottom:.75rem">Instaurado — fluxo PTAC</div>
+        <div class="scorecards" style="grid-template-columns:repeat(3,1fr)">
+          <div class="scorecard compacto"><div class="scorecard-label">Processos instaurados</div><div class="scorecard-valor azul pequeno" id="kpi-ptac">0</div></div>
+          <div class="scorecard compacto"><div class="scorecard-label">Valor total instaurado</div><div class="scorecard-valor azul pequeno" id="kpi-saldo-total-instaurado">R$ 0</div></div>
+          <div class="scorecard compacto"><div class="scorecard-label">Execucoes fiscais</div><div class="scorecard-valor azul pequeno" id="kpi-ef-total-instaurado">0</div></div>
         </div>
-        <div id="barra-saldo"></div>
       </div>
 
       <div class="painel-card" style="margin-bottom:1rem;padding:1.25rem 1.5rem">
-        <div class="painel-titulo" style="margin-bottom:.75rem">Numero de execucoes fiscais — fluxo PTAC</div>
-        <div class="scorecards" style="grid-template-columns:repeat(3,1fr);margin-bottom:.75rem">
-          <div class="scorecard compacto"><div class="scorecard-label">Em curso</div><div class="scorecard-valor laranja pequeno" id="kpi-ef-em-curso">0</div></div>
-          <div class="scorecard compacto"><div class="scorecard-label">Extintas (concluido)</div><div class="scorecard-valor verde pequeno" id="kpi-ef-concluido">0</div></div>
-          <div class="scorecard compacto"><div class="scorecard-label">Total instaurado</div><div class="scorecard-valor azul pequeno" id="kpi-ef-total-instaurado">0</div></div>
+        <div class="painel-titulo" style="margin-bottom:.75rem">Em curso — fluxo PTAC</div>
+        <div class="scorecards" style="grid-template-columns:repeat(3,1fr)">
+          <div class="scorecard compacto"><div class="scorecard-label">Processos em curso</div><div class="scorecard-valor laranja pequeno" id="kpi-falencia">0</div></div>
+          <div class="scorecard compacto"><div class="scorecard-label">Valor em curso</div><div class="scorecard-valor laranja pequeno" id="kpi-saldo-em-curso">R$ 0</div></div>
+          <div class="scorecard compacto"><div class="scorecard-label">Execucoes fiscais em curso</div><div class="scorecard-valor laranja pequeno" id="kpi-ef-em-curso">0</div></div>
         </div>
-        <div id="barra-ef"></div>
+      </div>
+
+      <div class="painel-card" style="margin-bottom:1.5rem;padding:1.25rem 1.5rem">
+        <div class="painel-titulo" style="margin-bottom:.75rem">Concluido — fluxo PTAC</div>
+        <div class="scorecards" style="grid-template-columns:repeat(3,1fr)">
+          <div class="scorecard compacto"><div class="scorecard-label">Processos concluidos</div><div class="scorecard-valor verde pequeno" id="kpi-inventario">0</div></div>
+          <div class="scorecard compacto"><div class="scorecard-label">Tratamento adequado (valor)</div><div class="scorecard-valor verde pequeno" id="kpi-saldo-concluido">R$ 0</div></div>
+          <div class="scorecard compacto"><div class="scorecard-label">Execucoes fiscais extintas</div><div class="scorecard-valor verde pequeno" id="kpi-ef-concluido">0</div></div>
+        </div>
       </div>
 
       <div class="painel-card" style="margin-bottom:1.5rem;padding:1.25rem 1.5rem">
@@ -945,12 +949,10 @@ async function renderPainel() {
   document.getElementById("kpi-saldo-em-curso").textContent = fmt(painel.saldoEmCurso);
   document.getElementById("kpi-saldo-concluido").textContent = fmt(painel.saldoConcluido);
   document.getElementById("kpi-saldo-total-instaurado").textContent = fmt(painel.saldoEmCurso + painel.saldoConcluido);
-  document.getElementById("barra-saldo").innerHTML = barraDuasCoresHtml(painel.saldoEmCurso, painel.saldoConcluido, fmt, { emCurso: painel.casosEmCurso, concluido: painel.casosConcluidos });
 
   document.getElementById("kpi-ef-em-curso").textContent = numFmt(painel.efEmCurso);
   document.getElementById("kpi-ef-concluido").textContent = numFmt(painel.efConcluido);
   document.getElementById("kpi-ef-total-instaurado").textContent = numFmt(painel.efEmCurso + painel.efConcluido);
-  document.getElementById("barra-ef").innerHTML = barraDuasCoresHtml(painel.efEmCurso, painel.efConcluido, numFmt);
 
   document.getElementById("kpi-cdas-em-curso").textContent = numFmt(painel.cdasEmCurso);
   document.getElementById("kpi-cdas-concluido").textContent = numFmt(painel.cdasConcluido);
