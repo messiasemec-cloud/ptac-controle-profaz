@@ -143,6 +143,16 @@ select:focus { border-color: var(--verde); }
 .seg-legenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--texto-sec); margin-top: 6px; }
 .seg-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
 .selo-contagem { display: inline-block; padding: 1px 7px; border-radius: 10px; background: #eef1f4; color: var(--texto-sec); font-weight: 600; font-size: 10.5px; margin-right: 5px; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 20px; }
+.modal-caixa { background: var(--branco); border-radius: var(--radius-lg); padding: 1.5rem; max-width: 560px; width: 100%; max-height: 85vh; overflow-y: auto; }
+.modal-titulo { font-family: 'Source Serif 4', serif; font-size: 17px; font-weight: 600; margin-bottom: 4px; }
+.modal-sub { font-size: 12.5px; color: var(--texto-sec); margin-bottom: 16px; }
+.hipotese-item { border: 1.5px solid var(--cinza-borda); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; cursor: pointer; transition: border-color .15s, background .15s; }
+.hipotese-item:hover { border-color: var(--verde); background: rgba(10,138,122,.04); }
+.hipotese-item.selecionada { border-color: var(--verde); background: rgba(10,138,122,.08); }
+.hipotese-label { font-weight: 600; font-size: 13.5px; color: var(--texto); margin-bottom: 3px; }
+.hipotese-texto { font-size: 12px; color: var(--texto-sec); line-height: 1.4; }
+.btn-fechar-modal { width: 100%; margin-top: 6px; padding: 10px; background: none; border: none; color: var(--texto-sec); font-size: 13px; cursor: pointer; text-decoration: underline; font-family: inherit; }
 .bem-row-fora { opacity: .5; }
 .bem-row-fora input, .bem-row-fora select { border-color: #d9a5a0 !important; background: #fdf5f4; }
 
@@ -177,6 +187,7 @@ select:focus { border-color: var(--verde); }
     <div class="abas">
       <button class="aba ativa" id="nav-painel" onclick="mostrarPagina('painel')">Painel geral</button>
       <button class="aba" id="nav-andamento" onclick="mostrarPagina('andamento')">Andamento</button>
+      <button class="aba" id="nav-progresso" onclick="mostrarPagina('progresso')">Progresso</button>
       <button class="aba" id="nav-entrada" onclick="mostrarPagina('entrada')">Nova entrada</button>
     </div>
   </div>
@@ -189,24 +200,11 @@ select:focus { border-color: var(--verde); }
         <div class="form-title">Registrar novo caso</div>
         <div class="form-sub">Preencha os dados do devedor para incluir no controle</div>
 
-        <div class="group-title">Eixo</div>
-        <div class="tag-grid" id="grupo-eixo" style="margin-bottom:1.4rem">
-          <div class="tag selected" data-valor="PTAC" onclick="selecionarTag('eixo', this)">PTAC</div>
-          <div class="tag" data-valor="Falencia" onclick="selecionarTag('eixo', this)">Falencia</div>
-          <div class="tag" data-valor="Inventario" onclick="selecionarTag('eixo', this)">Inventario</div>
-        </div>
-
-        <div class="group-title">Responsavel</div>
-        <div class="dest-grid" id="grupo-resp" style="margin-bottom:1.4rem">
-          <div class="dest-card selected" data-valor="Gerliane Martins" onclick="selecionarDest(this)">
-            <div class="dest-name">Gerliane Martins</div><div class="dest-role">Eixo PTAC</div>
-          </div>
-          <div class="dest-card" data-valor="Emanuel Sales" onclick="selecionarDest(this)">
-            <div class="dest-name">Emanuel Sales</div><div class="dest-role">Eixo Falencias</div>
-          </div>
-          <div class="dest-card" data-valor="Leticia Melo" onclick="selecionarDest(this)">
-            <div class="dest-name">Leticia Melo</div><div class="dest-role">Eixo Inventarios</div>
-          </div>
+        <div class="field">
+          <label>Hipotese de incidencia (Art. 5º, §1º, Portaria 53/2026-GPG)</label>
+          <button type="button" class="btn-buscar" style="background:var(--branco);color:var(--texto);border:1.5px solid var(--cinza-borda);text-align:left;font-weight:400" onclick="abrirModalHipotese()">
+            <span id="hipotese-resumo">Selecionar hipotese...</span>
+          </button>
         </div>
 
         <div class="field"><label>Devedor</label><input type="text" id="f-devedor" placeholder="Nome do devedor"></div>
@@ -262,12 +260,6 @@ select:focus { border-color: var(--verde); }
       <div class="form-card">
         <div class="form-title">Buscar devedor</div>
         <div class="form-sub">Digite o nome para localizar o caso</div>
-        <div id="filtro-eixo-andamento" style="display:flex;gap:8px;margin-bottom:12px">
-          <div class="tag selected" data-valor="" onclick="filtroEixoAndamento=this.dataset.valor; listaFocoId=null; document.querySelectorAll('#filtro-eixo-andamento .tag').forEach(t=>t.classList.remove('selected')); this.classList.add('selected'); renderBusca();">Todos</div>
-          <div class="tag" data-valor="PTAC" onclick="filtroEixoAndamento=this.dataset.valor; listaFocoId=null; document.querySelectorAll('#filtro-eixo-andamento .tag').forEach(t=>t.classList.remove('selected')); this.classList.add('selected'); renderBusca();">PTAC</div>
-          <div class="tag" data-valor="Falencia" onclick="filtroEixoAndamento=this.dataset.valor; listaFocoId=null; document.querySelectorAll('#filtro-eixo-andamento .tag').forEach(t=>t.classList.remove('selected')); this.classList.add('selected'); renderBusca();">Falencia</div>
-          <div class="tag" data-valor="Inventario" onclick="filtroEixoAndamento=this.dataset.valor; listaFocoId=null; document.querySelectorAll('#filtro-eixo-andamento .tag').forEach(t=>t.classList.remove('selected')); this.classList.add('selected'); renderBusca();">Inventario</div>
-        </div>
         <input type="text" id="busca-devedor" placeholder="Ex: Orgal, Panorama..." oninput="listaFocoId=null; renderBusca()">
         <div id="lista-busca" style="margin-top:12px"></div>
       </div>
@@ -277,10 +269,10 @@ select:focus { border-color: var(--verde); }
     <!-- PAGINA: PAINEL GERAL -->
     <div id="page-painel" class="page active">
       <div class="scorecards">
-        <div class="scorecard compacto"><div class="scorecard-label">Total de casos</div><div class="scorecard-valor azul pequeno" id="kpi-total">0</div><div class="scorecard-sub">nos tres eixos</div></div>
-        <div class="scorecard compacto"><div class="scorecard-label">Eixo PTAC</div><div class="scorecard-valor verde pequeno" id="kpi-ptac">0</div><div class="scorecard-sub">casos cadastrados</div></div>
-        <div class="scorecard compacto"><div class="scorecard-label">Eixo Falencia</div><div class="scorecard-valor verde pequeno" id="kpi-falencia">0</div><div class="scorecard-sub">casos cadastrados</div></div>
-        <div class="scorecard compacto"><div class="scorecard-label">Eixo Inventario</div><div class="scorecard-valor verde pequeno" id="kpi-inventario">0</div><div class="scorecard-sub">casos cadastrados</div></div>
+        <div class="scorecard compacto"><div class="scorecard-label">Total</div><div class="scorecard-valor azul pequeno" id="kpi-total">0</div><div class="scorecard-sub">casos cadastrados</div></div>
+        <div class="scorecard compacto"><div class="scorecard-label">Processos instaurados</div><div class="scorecard-valor azul pequeno" id="kpi-ptac">0</div><div class="scorecard-sub">ja passaram pela instauracao</div></div>
+        <div class="scorecard compacto"><div class="scorecard-label">Processos em curso</div><div class="scorecard-valor laranja pequeno" id="kpi-falencia">0</div><div class="scorecard-sub">ainda nao concluidos</div></div>
+        <div class="scorecard compacto"><div class="scorecard-label">Processos concluidos</div><div class="scorecard-valor verde pequeno" id="kpi-inventario">0</div><div class="scorecard-sub">tratamento adequado recebido</div></div>
       </div>
 
       <div class="painel-card" style="margin-bottom:1rem;padding:1.25rem 1.5rem">
@@ -313,6 +305,20 @@ select:focus { border-color: var(--verde); }
         <div id="barra-cdas"></div>
       </div>
 
+    </div>
+
+    <!-- MODAL: HIPOTESE DE INCIDENCIA -->
+    <div id="modal-hipotese" class="modal-overlay" style="display:none">
+      <div class="modal-caixa">
+        <div class="modal-titulo">Hipotese de incidencia — Art. 5º, §1º, Portaria 53/2026-GPG</div>
+        <div class="modal-sub">Selecione a hipotese que enquadra este devedor no PTAC. Lista provisoria, sujeita a revisao.</div>
+        <div id="lista-hipoteses"></div>
+        <button class="btn-fechar-modal" onclick="fecharModalHipotese()">Fechar sem selecionar</button>
+      </div>
+    </div>
+
+    <!-- PAGINA: PROGRESSO -->
+    <div id="page-progresso" class="page">
       <div class="painel-card">
         <div class="painel-titulo">Progresso por devedor</div>
         <div id="tabela-painel"></div>
@@ -327,7 +333,35 @@ const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwExDsErJUwGo9W
 let casos = [];
 let casoSelecionado = null;
 let eixoSelecionado = "PTAC";
-let respSelecionado = "Gerliane Martins";
+let respSelecionado = "";
+let hipoteseSelecionada = "";
+
+const HIPOTESES_INCIDENCIA = [
+  { label: "I — Massa falida", texto: "Massas falidas, nas hipoteses previstas no art. 2º, §2º, da Portaria (habilitacao ja tentada e manifestamente ineficaz, ou falencia encerrada sem habilitacao)." },
+  { label: "II — Espolio", texto: "Espolios, nos casos elencados no art. 3º, §2º, da Portaria (habilitacao ja tentada e manifestamente ineficaz, ou inventario encerrado/nao instaurado sem habilitacao)." },
+  { label: "III — Liquidacao extrajudicial", texto: "Pessoas juridicas em regime de liquidacao extrajudicial." },
+  { label: "IV — PJ baixada por liquidacao", texto: "Pessoas juridicas baixadas por encerramento de liquidacao judicial ou extrajudicial." },
+  { label: "V — CNPJ inapto ha +10 anos", texto: "Pessoas juridicas com Cadastro Nacional de Pessoa Juridica (CNPJ) baixado ou inapto ha mais de 10 (dez) anos." },
+  { label: "VI — Execucao comprovadamente inefetiva (saldo > R$5mi)", texto: "Outros casos em que ficar comprovada a inefetividade das execucoes fiscais ja ajuizadas em face de devedor que possua saldo devedor consolidado superior a R$ 5.000.000,00 (cinco milhoes de reais)." }
+];
+
+function abrirModalHipotese() {
+  const lista = document.getElementById("lista-hipoteses");
+  lista.innerHTML = HIPOTESES_INCIDENCIA.map((h, i) => `
+    <div class="hipotese-item ${hipoteseSelecionada === h.label ? "selecionada" : ""}" onclick="selecionarHipotese(${i})">
+      <div class="hipotese-label">${h.label}</div>
+      <div class="hipotese-texto">${h.texto}</div>
+    </div>`).join("");
+  document.getElementById("modal-hipotese").style.display = "flex";
+}
+function fecharModalHipotese() {
+  document.getElementById("modal-hipotese").style.display = "none";
+}
+function selecionarHipotese(i) {
+  hipoteseSelecionada = HIPOTESES_INCIDENCIA[i].label;
+  document.getElementById("hipotese-resumo").textContent = hipoteseSelecionada;
+  fecharModalHipotese();
+}
 
 function selecionarTag(grupo, el) {
   el.parentElement.querySelectorAll(".tag").forEach(t => t.classList.remove("selected"));
@@ -365,12 +399,13 @@ async function api(acao, params, tentativa) {
 async function carregarCasos() { casos = await api("listarCasos"); }
 
 function mostrarPagina(nome) {
-  ["entrada","andamento","painel"].forEach(p => {
+  ["entrada","andamento","painel","progresso"].forEach(p => {
     document.getElementById("page-"+p).classList.toggle("active", p===nome);
     document.getElementById("nav-"+p).classList.toggle("ativa", p===nome);
   });
   if (nome === "andamento") { carregarCasos().then(renderBusca); }
   if (nome === "painel") { renderPainel(); }
+  if (nome === "progresso") { renderPainel(); }
 }
 
 async function registrarCaso() {
@@ -387,11 +422,14 @@ async function registrarCaso() {
     obs: document.getElementById("f-obs").value,
     resultadoPesquisa: document.getElementById("f-resultado-pesquisa").value,
     quemPesquisou: document.getElementById("f-quem-pesquisou").value,
-    valorBensEspolio: document.getElementById("f-valor-bens").value || ""
+    valorBensEspolio: document.getElementById("f-valor-bens").value || "",
+    hipotese: hipoteseSelecionada
   });
   ["f-devedor","f-doc","f-processo","f-saldo","f-obs","f-valor-bens"].forEach(id => document.getElementById(id).value = "");
   document.getElementById("f-resultado-pesquisa").value = "";
   document.getElementById("f-quem-pesquisou").value = "";
+  hipoteseSelecionada = "";
+  document.getElementById("hipotese-resumo").textContent = "Selecionar hipotese...";
   const conf = document.getElementById("confirma-registro");
   conf.style.display = "block";
   setTimeout(() => conf.style.display = "none", 3000);
@@ -491,7 +529,6 @@ function renderBusca() {
       <div class="avatar">${iniciais(c.Devedor)}</div>
       <div style="flex:1">
         <div class="lista-nome">${c.Devedor}${c.Documento ? ` <span style="font-weight:400;color:var(--texto-sec);font-size:12px">- ${c.Documento}</span>` : ""}</div>
-        <div class="lista-sub">${c.Eixo} · ${c.Responsavel}</div>
       </div>
       <span class="badge ${bc}">${c.Status}</span>`;
     lista.appendChild(row);
@@ -597,9 +634,6 @@ async function renderFicha() {
         <div>
           <div class="ficha-nome">${c.Devedor}</div>
           <div class="ficha-sub">${c.Documento||"sem documento"} · Saldo devedor atual: <b>${fmt(saldoCaso(c))}</b></div>
-        </div>
-        <div style="display:flex;gap:6px;align-items:flex-start">
-          <span class="badge badge-habilitado">${c.Eixo}</span>
         </div>
       </div>
       ${tracker}
@@ -902,9 +936,9 @@ const corPorFasePTAC = {
 async function renderPainel() {
   const painel = await api("painelGeral");
   document.getElementById("kpi-total").textContent = painel.totalCasos;
-  document.getElementById("kpi-ptac").textContent = (painel.porEixo["PTAC"]||0);
-  document.getElementById("kpi-falencia").textContent = (painel.porEixo["Falencia"]||0);
-  document.getElementById("kpi-inventario").textContent = (painel.porEixo["Inventario"]||0);
+  document.getElementById("kpi-ptac").textContent = (painel.casosEmCurso + painel.casosConcluidos);
+  document.getElementById("kpi-falencia").textContent = painel.casosEmCurso;
+  document.getElementById("kpi-inventario").textContent = painel.casosConcluidos;
 
   const numFmt = n => Number(n).toLocaleString('pt-BR');
 
@@ -957,7 +991,6 @@ async function renderPainel() {
       <div class="prog-topo">
         <div>
           <span style="font-weight:600;font-size:13px">${c.Devedor}</span>${c.Documento ? ` <span style="font-weight:400;color:var(--texto-sec);font-size:12px">- ${c.Documento}</span>` : ""}
-          <span style="font-size:12px;color:var(--texto-sec);margin-left:6px">${c.Eixo}</span>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
           ${selo}
