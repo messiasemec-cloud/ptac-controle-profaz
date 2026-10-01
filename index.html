@@ -406,10 +406,14 @@ async function gerarRelatorio(periodo) {
   }
 }
 
-function abrirModalHipotese() {
+let modalHipoteseCasoId = null;
+
+function abrirModalHipotese(casoId) {
+  modalHipoteseCasoId = casoId || null;
+  const atual = modalHipoteseCasoId ? (casos.find(x => String(x.ID) === String(modalHipoteseCasoId)) || {}).HipoteseIncidencia : hipoteseSelecionada;
   const lista = document.getElementById("lista-hipoteses");
   lista.innerHTML = HIPOTESES_INCIDENCIA.map((h, i) => `
-    <div class="hipotese-item ${hipoteseSelecionada === h.label ? "selecionada" : ""}" onclick="selecionarHipotese(${i})">
+    <div class="hipotese-item ${atual === h.label ? "selecionada" : ""}" onclick="selecionarHipotese(${i})">
       <div class="hipotese-label">${h.label}</div>
       <div class="hipotese-texto">${h.texto}</div>
     </div>`).join("");
@@ -418,10 +422,19 @@ function abrirModalHipotese() {
 function fecharModalHipotese() {
   document.getElementById("modal-hipotese").style.display = "none";
 }
-function selecionarHipotese(i) {
-  hipoteseSelecionada = HIPOTESES_INCIDENCIA[i].label;
-  document.getElementById("hipotese-resumo").textContent = hipoteseSelecionada;
-  fecharModalHipotese();
+async function selecionarHipotese(i) {
+  const label = HIPOTESES_INCIDENCIA[i].label;
+  if (modalHipoteseCasoId) {
+    fecharModalHipotese();
+    await api("atualizarCampoCaso", { id: modalHipoteseCasoId, campo: "hipotese", valor: label });
+    await carregarCasos();
+    renderFicha();
+    renderBusca();
+  } else {
+    hipoteseSelecionada = label;
+    document.getElementById("hipotese-resumo").textContent = label;
+    fecharModalHipotese();
+  }
 }
 
 function selecionarTag(grupo, el) {
@@ -619,7 +632,7 @@ function blocoInventarioFicha(c) {
     <div class="field-row">
       <div>
         <label>Resultado da pesquisa</label>
-        <select onchange="atualizarCasoInventario('${c.ID}','resultadoPesquisa',this.value)">
+        <select onchange="atualizarCampoCaso('${c.ID}','resultadoPesquisa',this.value)">
           <option value="" ${!c.ResultadoPesquisa?"selected":""}>Ainda nao pesquisado</option>
           <option value="Em curso" ${c.ResultadoPesquisa==="Em curso"?"selected":""}>Inventario em curso</option>
           <option value="Finalizado" ${c.ResultadoPesquisa==="Finalizado"?"selected":""}>Inventario ja finalizado</option>
@@ -628,7 +641,7 @@ function blocoInventarioFicha(c) {
       </div>
       <div>
         <label>Quem pesquisou primeiro</label>
-        <select onchange="atualizarCasoInventario('${c.ID}','quemPesquisou',this.value)">
+        <select onchange="atualizarCampoCaso('${c.ID}','quemPesquisou',this.value)">
           <option value="" ${!c.QuemPesquisou?"selected":""}>Nao definido</option>
           <option value="Leticia" ${c.QuemPesquisou==="Leticia"?"selected":""}>Leticia</option>
           <option value="Procurador" ${c.QuemPesquisou==="Procurador"?"selected":""}>Procurador</option>
@@ -648,13 +661,13 @@ function blocoInventarioFicha(c) {
 
 async function salvarValorBens(id) {
   const valor = document.getElementById("valor-bens-" + id).value;
-  await api("atualizarCasoInventario", { id: id, campo: "valorBensEspolio", valor: valor });
+  await api("atualizarCampoCaso", { id: id, campo: "valorBensEspolio", valor: valor });
   await carregarCasos();
   renderFicha();
 }
 
-async function atualizarCasoInventario(id, campo, valor) {
-  await api("atualizarCasoInventario", { id: id, campo: campo, valor: valor });
+async function atualizarCampoCaso(id, campo, valor) {
+  await api("atualizarCampoCaso", { id: id, campo: campo, valor: valor });
   await carregarCasos();
   renderFicha();
 }
@@ -706,11 +719,12 @@ async function renderFicha() {
       </div>
       <div class="field">
         <label>Hipotese de incidencia</label>
-        <div style="font-size:13.5px;color:var(--texto)">
+        <div style="font-size:13.5px;color:var(--texto);margin-bottom:6px">
           ${hipoteseInfo(c.HipoteseIncidencia)
             ? `<b>${hipoteseInfo(c.HipoteseIncidencia).citacao}</b><br><span style="color:var(--texto-sec);font-size:12.5px">${hipoteseInfo(c.HipoteseIncidencia).texto}</span>`
             : `<span style="color:var(--texto-sec)">A hipotese de incidencia ainda nao foi informada para este caso.</span>`}
         </div>
+        <a href="#" style="font-size:12.5px;color:var(--verde);text-decoration:underline" onclick="abrirModalHipotese('${c.ID}'); return false;">${c.HipoteseIncidencia ? "Alterar hipotese" : "Selecionar hipotese"}</a>
       </div>
       ${podeEncaminharPtac ? `<button class="btn-buscar" style="background:var(--laranja);margin-bottom:1rem" onclick="confirmarEncaminharPtac('${c.ID}','${c.Devedor.replace(/'/g,"\\'")}')">Encaminhar ao PTAC</button>` : ""}
       <div class="field">
