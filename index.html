@@ -321,8 +321,14 @@ select:focus { border-color: var(--verde); }
       <div class="modal-caixa" style="max-width:380px">
         <div class="modal-titulo">Gerar relatorio de PTAC</div>
         <div class="modal-sub">Escolha o periodo de referencia do relatorio.</div>
-        <div class="hipotese-item" onclick="gerarRelatorio('mes')"><div class="hipotese-label">Mes atual</div></div>
-        <div class="hipotese-item" onclick="gerarRelatorio('ano')"><div class="hipotese-label">Ano corrente</div></div>
+
+        <div class="hipotese-item" style="cursor:default">
+          <div class="hipotese-label" style="margin-bottom:8px">Mes especifico</div>
+          <select id="relatorio-select-mes" style="width:100%;padding:8px;border:1.5px solid var(--cinza-borda);border-radius:var(--radius);font-family:inherit;font-size:13px;margin-bottom:8px"></select>
+          <button class="btn-buscar" style="width:100%" onclick="gerarRelatorio('mes_especifico')">Gerar relatorio deste mes</button>
+        </div>
+
+        <div class="hipotese-item" onclick="gerarRelatorio('ano')"><div class="hipotese-label">Ano corrente (separado por mes)</div></div>
         <div class="hipotese-item" onclick="gerarRelatorio('todo')"><div class="hipotese-label">Todo o periodo</div></div>
         <div id="relatorio-status" style="font-size:12.5px;color:var(--texto-sec);margin-top:6px"></div>
         <button class="btn-fechar-modal" onclick="document.getElementById('modal-relatorio').style.display='none'">Fechar</button>
@@ -384,9 +390,52 @@ function saldoCasoPDF(c) {
     : (Number(c.SaldoDevedor) || 0);
 }
 
-function abrirModalRelatorio() {
-  document.getElementById("relatorio-status").textContent = "";
+const NOMES_MESES_PT = ["Janeiro","Fevereiro","Marco","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+
+async function abrirModalRelatorio() {
+  document.getElementById("relatorio-status").textContent = "Carregando meses...";
   document.getElementById("modal-relatorio").style.display = "flex";
+  await carregarCasos();
+  const todosPtac = casos.filter(c => c.Fase === "PTAC");
+  const chaves = new Set();
+  todosPtac.forEach(c => {
+    [c.DataInstauracao, c.DataConclusao].forEach(d => {
+      if (!d) return;
+      const dt = new Date(d);
+      if (isNaN(dt)) return;
+      chaves.add(dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0"));
+    });
+  });
+  const hoje = new Date();
+  chaves.add(hoje.getFullYear() + "-" + String(hoje.getMonth() + 1).padStart(2, "0"));
+  const ordenadas = [...chaves].sort().reverse();
+  const sel = document.getElementById("relatorio-select-mes");
+  sel.innerHTML = ordenadas.map(k => {
+    const [ano, mes] = k.split("-").map(Number);
+    return `<option value="${k}">${NOMES_MESES_PT[mes - 1]} de ${ano}</option>`;
+  }).join("");
+  document.getElementById("relatorio-status").textContent = "";
+}
+
+function desenharCardsResumo(doc, y0, mL, contentW, cards) {
+  const gap = 3;
+  const cw = (contentW - gap * (cards.length - 1)) / cards.length;
+  const ch = 17;
+  cards.forEach((c, i) => {
+    const cx = mL + i * (cw + gap);
+    doc.setDrawColor(221, 225, 229);
+    doc.setLineWidth(0.3);
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(cx, y0, cw, ch, 1.5, 1.5, "FD");
+    doc.setFont("helvetica", "normal"); doc.setFontSize(6);
+    doc.setTextColor(90, 100, 114);
+    const lblLines = doc.splitTextToSize(c.label.toUpperCase(), cw - 4);
+    doc.text(lblLines, cx + cw / 2, y0 + 5, { align: "center" });
+    doc.setFont("helvetica", "bold"); doc.setFontSize(12);
+    doc.setTextColor(...c.cor);
+    doc.text(String(c.valor), cx + cw / 2, y0 + 13, { align: "center" });
+  });
+  return y0 + ch;
 }
 
 async function gerarRelatorio(periodo) {
@@ -396,7 +445,6 @@ async function gerarRelatorio(periodo) {
     await carregarCasos();
     const todosPtac = casos.filter(c => c.Fase === "PTAC");
     const hoje = new Date();
-    const meses = ["Janeiro","Fevereiro","Marco","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
     let inicio, fim, tituloPeriodo;
     if (periodo === "ano") {
       inicio = new Date(hoje.getFullYear(), 0, 1);
@@ -406,10 +454,16 @@ async function gerarRelatorio(periodo) {
       inicio = new Date(2000, 0, 1);
       fim = new Date(2100, 0, 1);
       tituloPeriodo = "Todo o periodo";
+    } else if (periodo === "mes_especifico") {
+      const valSel = document.getElementById("relatorio-select-mes").value;
+      const [ano, mes] = valSel.split("-").map(Number);
+      inicio = new Date(ano, mes - 1, 1);
+      fim = new Date(ano, mes, 0, 23, 59, 59);
+      tituloPeriodo = NOMES_MESES_PT[mes - 1] + " de " + ano;
     } else {
       inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
       fim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59);
-      tituloPeriodo = meses[hoje.getMonth()] + " de " + hoje.getFullYear();
+      tituloPeriodo = NOMES_MESES_PT[hoje.getMonth()] + " de " + hoje.getFullYear();
     }
     const dentroPeriodo = (d) => { if (!d) return false; const dt = new Date(d); return dt >= inicio && dt <= fim; };
     const instaurados = todosPtac.filter(c => dentroPeriodo(c.DataInstauracao));
@@ -422,7 +476,8 @@ async function gerarRelatorio(periodo) {
     const contentW = pW - mL - mR;
     let y = 14;
 
-    doc.addImage(LOGO_PGM_PTAC_B64, "PNG", mL, y, 70, 14.1);
+    const logoW = 70, logoH = 14.1;
+    doc.addImage(LOGO_PGM_PTAC_B64, "PNG", (pW - logoW) / 2, y, logoW, logoH);
     y += 22;
 
     doc.setTextColor(26, 31, 36);
@@ -460,12 +515,7 @@ async function gerarRelatorio(periodo) {
     const colsW = [52, 28, 16, 33, 19, contentW - (52 + 28 + 16 + 33 + 19)];
     const colsLabel = ["Nome do contribuinte", "CPF/CNPJ", "No CDAs", "Saldo devedor", "Exec. fiscais", "Status"];
 
-    function desenharTabela(titulo, lista) {
-      quebrarSeNecessario(16);
-      doc.setFont("helvetica", "bold"); doc.setFontSize(10);
-      doc.setTextColor(10, 138, 122);
-      doc.text(titulo, mL, y); y += 5;
-
+    function desenharLinhasTabela(lista, subtotuloTotal) {
       quebrarSeNecessario(8);
       doc.setFillColor(31, 56, 100);
       doc.rect(mL, y, contentW, 6, "F");
@@ -508,20 +558,75 @@ async function gerarRelatorio(periodo) {
       doc.setFillColor(252, 228, 214);
       doc.rect(mL, y, contentW, 6.5, "F");
       doc.setFont("helvetica", "bold"); doc.setFontSize(7.5);
-      doc.text("TOTAL (" + lista.length + ")", mL + 1.5, y + 4.3);
+      doc.text((subtotuloTotal || "TOTAL") + " (" + lista.length + ")", mL + 1.5, y + 4.3);
       doc.text(String(totCdas), mL + colsW[0] + colsW[1] + 1.5, y + 4.3);
       doc.text(fmt(totSaldo), mL + colsW[0] + colsW[1] + colsW[2] + 1.5, y + 4.3);
       doc.text(String(totEf), mL + colsW[0] + colsW[1] + colsW[2] + colsW[3] + 1.5, y + 4.3);
-      y += 6.5 + 8;
+      y += 6.5 + 6;
       doc.setFont("helvetica", "normal");
+      return { totCdas, totEf, totSaldo };
     }
 
-    desenharTabela("PTAC'S INSTAURADOS NO PERIODO", instaurados);
-    desenharTabela("PTAC'S CONCLUIDOS NO PERIODO", concluidos);
+    function desenharResumoDaSecao(lista, labels, cores) {
+      quebrarSeNecessario(20);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+      doc.setTextColor(26, 31, 36);
+      doc.text("RESUMO DO PERIODO", mL, y); y += 4;
+      const totCdas = lista.reduce((s, c) => s + (Number(c.NumeroCDAs) || 0), 0);
+      const totEf = lista.reduce((s, c) => s + (Number(c.NumeroExecucoesFiscais) || 0), 0);
+      const totSaldo = lista.reduce((s, c) => s + saldoCasoPDF(c), 0);
+      const cards = [
+        { label: labels[0], valor: lista.length, cor: cores[0] },
+        { label: labels[1], valor: totCdas, cor: cores[1] },
+        { label: labels[2], valor: totEf, cor: cores[2] },
+        { label: labels[3], valor: fmt(totSaldo), cor: cores[3] }
+      ];
+      y = desenharCardsResumo(doc, y, mL, contentW, cards) + 10;
+    }
+
+    function desenharSecao(titulo, lista, campoData, labelsResumo, coresResumo) {
+      quebrarSeNecessario(16);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+      doc.setTextColor(10, 138, 122);
+      doc.text(titulo, mL, y); y += 5;
+
+      if (periodo === "ano" && lista.length > 0) {
+        const grupos = {};
+        lista.forEach(c => {
+          const dt = new Date(c[campoData]);
+          const chave = dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0");
+          (grupos[chave] = grupos[chave] || []).push(c);
+        });
+        Object.keys(grupos).sort().forEach(chave => {
+          const [anoG, mesG] = chave.split("-").map(Number);
+          quebrarSeNecessario(12);
+          doc.setFont("helvetica", "bold"); doc.setFontSize(8.5);
+          doc.setTextColor(224, 80, 32);
+          doc.text(NOMES_MESES_PT[mesG - 1] + " de " + anoG, mL, y); y += 4.5;
+          desenharLinhasTabela(grupos[chave], "Subtotal " + NOMES_MESES_PT[mesG - 1]);
+        });
+        y += 2;
+      } else {
+        desenharLinhasTabela(lista);
+      }
+
+      desenharResumoDaSecao(lista, labelsResumo, coresResumo);
+    }
+
+    desenharSecao(
+      "PTAC'S INSTAURADOS NO PERIODO", instaurados, "DataInstauracao",
+      ["PTAC's instaurados", "Total de CDAs", "Execucoes fiscais", "Saldo devedor total"],
+      [[24, 95, 165], [24, 95, 165], [224, 80, 32], [10, 138, 122]]
+    );
+    desenharSecao(
+      "PTAC'S CONCLUIDOS NO PERIODO", concluidos, "DataConclusao",
+      ["PTAC's concluidos", "Total de CDAs", "Exec. fiscais extintas", "Creditos cancelados"],
+      [[10, 138, 122], [24, 95, 165], [224, 80, 32], [10, 138, 122]]
+    );
 
     quebrarSeNecessario(30);
-    y += 8;
     doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+    doc.setTextColor(26, 31, 36);
     doc.text("Fortaleza - CE, " + hoje.toLocaleDateString("pt-BR") + ".", pW / 2, y, { align: "center" });
     y += 18;
     doc.text("_______________________________________", pW / 2, y, { align: "center" }); y += 5;
