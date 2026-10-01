@@ -366,6 +366,14 @@ const HIPOTESES_INCIDENCIA = [
   { label: "VI — Execucao comprovadamente inefetiva (saldo > R$5mi)", texto: "Outros casos em que ficar comprovada a inefetividade das execucoes fiscais ja ajuizadas em face de devedor que possua saldo devedor consolidado superior a R$ 5.000.000,00 (cinco milhoes de reais)." }
 ];
 
+function hipoteseInfo(label) {
+  if (!label) return null;
+  const item = HIPOTESES_INCIDENCIA.find(h => h.label === label);
+  if (!item) return null;
+  const numeral = item.label.split(" — ")[0].trim();
+  return { citacao: `Art. 5º, §1º, ${numeral} Portaria 53/2026-GPG`, texto: item.texto };
+}
+
 function abrirModalRelatorio() {
   document.getElementById("relatorio-status").textContent = "";
   document.getElementById("modal-relatorio").style.display = "flex";
@@ -581,7 +589,7 @@ function renderBusca() {
     row.innerHTML = `
       <div class="avatar">${iniciais(c.Devedor)}</div>
       <div style="flex:1">
-        <div class="lista-nome">${c.Devedor}${c.Documento ? ` <span style="font-weight:400;color:var(--texto-sec);font-size:12px">- ${c.Documento}</span>` : ""}</div>
+        <div class="lista-nome">${c.Devedor}${c.Documento ? ` <span style="font-weight:400;color:var(--texto-sec);font-size:12px">- ${c.Documento}</span>` : ""} <span style="font-weight:400;color:var(--texto-sec);font-size:12px">· ${hipoteseInfo(c.HipoteseIncidencia) ? hipoteseInfo(c.HipoteseIncidencia).citacao : "Hipotese nao informada"}</span></div>
       </div>
       <span class="badge ${bc}">${c.Status}</span>`;
     lista.appendChild(row);
@@ -695,6 +703,14 @@ async function renderFicha() {
         <select id="ficha-status" onchange="atualizarStatusCaso('${c.ID}', this.value)">
           ${listaStatus.map(s => `<option ${s===c.Status?"selected":""}>${s}</option>`).join("")}
         </select>
+      </div>
+      <div class="field">
+        <label>Hipotese de incidencia</label>
+        <div style="font-size:13.5px;color:var(--texto)">
+          ${hipoteseInfo(c.HipoteseIncidencia)
+            ? `<b>${hipoteseInfo(c.HipoteseIncidencia).citacao}</b><br><span style="color:var(--texto-sec);font-size:12.5px">${hipoteseInfo(c.HipoteseIncidencia).texto}</span>`
+            : `<span style="color:var(--texto-sec)">A hipotese de incidencia ainda nao foi informada para este caso.</span>`}
+        </div>
       </div>
       ${podeEncaminharPtac ? `<button class="btn-buscar" style="background:var(--laranja);margin-bottom:1rem" onclick="confirmarEncaminharPtac('${c.ID}','${c.Devedor.replace(/'/g,"\\'")}')">Encaminhar ao PTAC</button>` : ""}
       <div class="field">
