@@ -6,6 +6,7 @@
 <title>Controle PTAC, Falencias e Inventarios — PROFAZ</title>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:wght@600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -327,7 +328,7 @@ select:focus { border-color: var(--verde); }
             <input type="radio" name="relatorio-formato" value="pdf" checked> PDF
           </label>
           <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-            <input type="radio" name="relatorio-formato" value="word"> Word (.doc)
+            <input type="radio" name="relatorio-formato" value="word"> Word (.docx)
           </label>
         </div>
 
@@ -457,31 +458,112 @@ function formatarDataBR(d) {
   return dt.toLocaleDateString("pt-BR");
 }
 
-function gerarRelatorioWord(dados) {
+function escXml(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
+
+function wRun(text, opts) {
+  opts = opts || {};
+  let rPr = '<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/>';
+  if (opts.bold) rPr += "<w:b/>";
+  if (opts.color) rPr += '<w:color w:val="' + opts.color + '"/>';
+  rPr += '<w:sz w:val="' + (opts.sz || 16) + '"/></w:rPr>';
+  if (text === "") return "";
+  return "<w:r>" + rPr + '<w:t xml:space="preserve">' + escXml(text) + "</w:t></w:r>";
+}
+
+function wPara(text, opts) {
+  opts = opts || {};
+  const jc = (opts.align === "center" || opts.align === "right") ? '<w:jc w:val="' + opts.align + '"/>' : "";
+  const sb = opts.spacingBefore || 0;
+  const sa = (opts.spacingAfter === undefined) ? 80 : opts.spacingAfter;
+  const pBdr = opts.topBorder ? '<w:pBdr><w:top w:val="single" w:sz="4" w:space="4" w:color="999999"/></w:pBdr>' : "";
+  return "<w:p><w:pPr>" + jc + pBdr + '<w:spacing w:before="' + sb + '" w:after="' + sa + '"/></w:pPr>' + wRun(text, opts) + "</w:p>";
+}
+
+function wCell(text, opts) {
+  opts = opts || {};
+  const w = opts.w;
+  const shd = opts.fill ? '<w:shd w:val="clear" w:color="auto" w:fill="' + opts.fill + '"/>' : "";
+  const gridSpan = (opts.span && opts.span > 1) ? '<w:gridSpan w:val="' + opts.span + '"/>' : "";
+  return "<w:tc><w:tcPr><w:tcW w:w=\"" + w + "\" w:type=\"dxa\"/>" + gridSpan + shd + '<w:vAlign w:val="center"/></w:tcPr>' + wPara(text, opts) + "</w:tc>";
+}
+
+function wImageInline(relId, cx, cy, idNum) {
+  return '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">'
+    + '<wp:extent cx="' + cx + '" cy="' + cy + '"/>'
+    + '<wp:docPr id="' + idNum + '" name="Picture' + idNum + '"/>'
+    + '<wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr>'
+    + '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">'
+    + '<pic:pic><pic:nvPicPr><pic:cNvPr id="' + idNum + '" name="Picture' + idNum + '"/><pic:cNvPicPr/></pic:nvPicPr>'
+    + '<pic:blipFill><a:blip r:embed="' + relId + '"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>'
+    + '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + cx + '" cy="' + cy + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>'
+    + '</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>';
+}
+
+async function gerarRelatorioDocx(dados) {
   const { tituloPeriodo, instaurados, concluidos, hoje, periodo } = dados;
 
-  function linhasTabelaHtml(lista, campoData, cabecalhoData, subtotuloPrefixo) {
-    const th = (txt) => `<th style="background:#1F3864;color:#fff;padding:5px 6px;font-size:10px;border:1px solid #999">${txt}</th>`;
-    const cabecalho = `<tr>${th("Nome do contribuinte")}${th("CPF/CNPJ")}${th("No CDAs")}${th("Saldo devedor")}${th("Exec. fiscais")}${th("Hipotese normativa")}${th(cabecalhoData)}${th("Status")}</tr>`;
+  const COLS_W = [2200, 1200, 700, 1300, 800, 1500, 900, 760]; // soma = 9360 twips (6.5in)
 
-    function linhasDe(sublista) {
-      if (sublista.length === 0) {
-        return `<tr><td colspan="8" style="padding:6px;border:1px solid #ccc;font-size:10px">Nenhum registro no periodo selecionado.</td></tr>`;
-      }
-      const corpo = sublista.map((c, i) => {
+  function tabelaDocx(lista, campoData, labelData, subtotuloPrefixo) {
+    const colsLabel = ["Nome do contribuinte", "CPF/CNPJ", "No CDAs", "Saldo devedor", "Exec. fiscais", "Hipotese normativa", labelData, "Status"];
+    const header = "<w:tr>" + colsLabel.map((lbl, i) => wCell(lbl, { w: COLS_W[i], fill: "1F3864", bold: true, align: "center", color: "FFFFFF", sz: 13 })).join("") + "</w:tr>";
+
+    let rows;
+    if (lista.length === 0) {
+      rows = "<w:tr>" + wCell("Nenhum registro no periodo selecionado.", { w: 9360, span: 8, sz: 14 }) + "</w:tr>";
+    } else {
+      rows = lista.map((c, i) => {
         const info = hipoteseInfo(c.HipoteseIncidencia);
-        const bg = i % 2 === 1 ? "#F0F3F7" : "#FFFFFF";
-        const td = (txt, align) => `<td style="padding:5px 6px;border:1px solid #ccc;font-size:10px;background:${bg};${align ? "text-align:" + align : ""}">${txt}</td>`;
-        return `<tr>${td(c.Devedor || "")}${td(c.Documento || "")}${td(c.NumeroCDAs || 0, "center")}${td(fmt(saldoCasoPDF(c)), "right")}${td(c.NumeroExecucoesFiscais || 0, "center")}${td(info ? info.citacao : "Nao informada")}${td(formatarDataBR(c[campoData]), "center")}${td(c.Status || "")}</tr>`;
+        const vals = [c.Devedor || "", c.Documento || "", String(c.NumeroCDAs || 0), fmt(saldoCasoPDF(c)), String(c.NumeroExecucoesFiscais || 0), info ? info.citacao : "Nao informada", formatarDataBR(c[campoData]), c.Status || ""];
+        const aligns = ["left", "center", "center", "right", "center", "left", "center", "left"];
+        const fillLinha = i % 2 === 1 ? "F0F3F7" : undefined;
+        return "<w:tr>" + vals.map((v, vi) => wCell(v, { w: COLS_W[vi], align: aligns[vi], fill: fillLinha, sz: 13 })).join("") + "</w:tr>";
       }).join("");
-      const totCdas = sublista.reduce((s, c) => s + (Number(c.NumeroCDAs) || 0), 0);
-      const totEf = sublista.reduce((s, c) => s + (Number(c.NumeroExecucoesFiscais) || 0), 0);
-      const totSaldo = sublista.reduce((s, c) => s + saldoCasoPDF(c), 0);
-      const tdT = (txt, align) => `<td style="padding:5px 6px;border:1px solid #ccc;font-size:10px;background:#FCE4D6;font-weight:bold;${align ? "text-align:" + align : ""}">${txt}</td>`;
-      const totalRow = `<tr>${tdT((subtotuloPrefixo || "TOTAL") + " (" + sublista.length + ")")}${tdT("")}${tdT(totCdas, "center")}${tdT(fmt(totSaldo), "right")}${tdT(totEf, "center")}${tdT("")}${tdT("")}${tdT("")}</tr>`;
-      return corpo + totalRow;
     }
 
+    const totCdas = lista.reduce((s, c) => s + (Number(c.NumeroCDAs) || 0), 0);
+    const totEf = lista.reduce((s, c) => s + (Number(c.NumeroExecucoesFiscais) || 0), 0);
+    const totSaldo = lista.reduce((s, c) => s + saldoCasoPDF(c), 0);
+    const totalRow = "<w:tr>"
+      + wCell((subtotuloPrefixo || "TOTAL") + " (" + lista.length + ")", { w: COLS_W[0] + COLS_W[1], span: 2, fill: "FCE4D6", bold: true, sz: 14 })
+      + wCell(String(totCdas), { w: COLS_W[2], fill: "FCE4D6", bold: true, align: "center", sz: 14 })
+      + wCell(fmt(totSaldo), { w: COLS_W[3], fill: "FCE4D6", bold: true, align: "right", sz: 14 })
+      + wCell(String(totEf), { w: COLS_W[4], fill: "FCE4D6", bold: true, align: "center", sz: 14 })
+      + wCell("", { w: COLS_W[5], fill: "FCE4D6" })
+      + wCell("", { w: COLS_W[6], fill: "FCE4D6" })
+      + wCell("", { w: COLS_W[7], fill: "FCE4D6" })
+      + "</w:tr>";
+
+    const tblBorders = '<w:tblBorders><w:top w:val="single" w:sz="4" w:color="CCCCCC"/><w:left w:val="single" w:sz="4" w:color="CCCCCC"/>'
+      + '<w:bottom w:val="single" w:sz="4" w:color="CCCCCC"/><w:right w:val="single" w:sz="4" w:color="CCCCCC"/>'
+      + '<w:insideH w:val="single" w:sz="4" w:color="CCCCCC"/><w:insideV w:val="single" w:sz="4" w:color="CCCCCC"/></w:tblBorders>';
+    return '<w:tbl><w:tblPr><w:tblW w:w="9360" w:type="dxa"/>' + tblBorders + '<w:tblLayout w:type="fixed"/></w:tblPr>'
+      + "<w:tblGrid>" + COLS_W.map(w => '<w:gridCol w:w="' + w + '"/>').join("") + "</w:tblGrid>"
+      + header + rows + totalRow + "</w:tbl>" + wPara("", { spacingAfter: 120 });
+  }
+
+  function resumoDocx(lista, labels, cores) {
+    const totCdas = lista.reduce((s, c) => s + (Number(c.NumeroCDAs) || 0), 0);
+    const totEf = lista.reduce((s, c) => s + (Number(c.NumeroExecucoesFiscais) || 0), 0);
+    const totSaldo = lista.reduce((s, c) => s + saldoCasoPDF(c), 0);
+    const valores = [lista.length, totCdas, totEf, fmt(totSaldo)];
+    const w = 2340;
+    const borda = '<w:tcBorders><w:top w:val="single" w:sz="4" w:color="DDDDDD"/><w:left w:val="single" w:sz="4" w:color="DDDDDD"/><w:bottom w:val="single" w:sz="4" w:color="DDDDDD"/><w:right w:val="single" w:sz="4" w:color="DDDDDD"/></w:tcBorders>';
+    const cells = labels.map((lbl, i) => {
+      return '<w:tc><w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/>' + borda + "</w:tcPr>"
+        + wPara(lbl.toUpperCase(), { align: "center", color: "5A6472", sz: 13, spacingAfter: 40 })
+        + wPara(String(valores[i]), { align: "center", bold: true, color: cores[i], sz: 26, spacingAfter: 0 })
+        + "</w:tc>";
+    }).join("");
+    return '<w:tbl><w:tblPr><w:tblW w:w="9360" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr>'
+      + "<w:tblGrid>" + '<w:gridCol w:w="' + w + '"/>'.repeat(4) + "</w:tblGrid>"
+      + "<w:tr>" + cells + "</w:tr></w:tbl>" + wPara("", { spacingAfter: 160 });
+  }
+
+  function seccaoTabela(lista, campoData, labelData, concluido) {
+    let tabelasXml;
     if (periodo === "ano" && lista.length > 0) {
       const grupos = {};
       lista.forEach(c => {
@@ -489,107 +571,131 @@ function gerarRelatorioWord(dados) {
         const chave = dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0");
         (grupos[chave] = grupos[chave] || []).push(c);
       });
-      return Object.keys(grupos).sort().map(chave => {
+      tabelasXml = Object.keys(grupos).sort().map(chave => {
         const [anoG, mesG] = chave.split("-").map(Number);
         const nomeMes = NOMES_MESES_PT[mesG - 1] + " de " + anoG;
-        return `<p style="font-weight:bold;color:#E05020;font-size:12px;margin:10px 0 4px">${nomeMes}</p>
-          <table style="border-collapse:collapse;width:100%">${cabecalho}${linhasDe(grupos[chave])}</table>`;
+        return wPara(nomeMes, { bold: true, color: "E05020", sz: 18, spacingBefore: 120, spacingAfter: 40 }) + tabelaDocx(grupos[chave], campoData, labelData, "Subtotal " + NOMES_MESES_PT[mesG - 1]);
       }).join("");
+    } else {
+      tabelasXml = tabelaDocx(lista, campoData, labelData);
     }
-    return `<table style="border-collapse:collapse;width:100%">${cabecalho}${linhasDe(lista)}</table>`;
+    const labels = concluido ? ["PTAC's concluidos", "Total de CDAs", "Exec. fiscais extintas", "Creditos cancelados"] : ["PTAC's instaurados", "Total de CDAs", "Execucoes fiscais", "Saldo devedor total"];
+    const cores = concluido ? ["0A8A7A", "185FA5", "E05020", "0A8A7A"] : ["185FA5", "185FA5", "E05020", "0A8A7A"];
+    return tabelasXml + wPara("RESUMO DO PERIODO", { bold: true, sz: 18, spacingBefore: 160, spacingAfter: 60 }) + resumoDocx(lista, labels, cores);
   }
 
-  function resumoHtml(lista, labels, cores) {
-    const totCdas = lista.reduce((s, c) => s + (Number(c.NumeroCDAs) || 0), 0);
-    const totEf = lista.reduce((s, c) => s + (Number(c.NumeroExecucoesFiscais) || 0), 0);
-    const totSaldo = lista.reduce((s, c) => s + saldoCasoPDF(c), 0);
-    const valores = [lista.length, totCdas, totEf, fmt(totSaldo)];
-    const cel = (label, valor, cor) => `
-      <td style="width:25%;border:1px solid #ddd;border-radius:4px;padding:10px;text-align:center;vertical-align:top">
-        <div style="font-size:8.5px;color:#5a6472;text-transform:uppercase;margin-bottom:4px">${label}</div>
-        <div style="font-size:16px;font-weight:bold;color:${cor}">${valor}</div>
-      </td>`;
-    return `<p style="font-weight:bold;margin:14px 0 6px">RESUMO DO PERIODO</p>
-      <table style="border-collapse:separate;border-spacing:6px 0;width:100%"><tr>
-        ${cel(labels[0], valores[0], cores[0])}${cel(labels[1], valores[1], cores[1])}${cel(labels[2], valores[2], cores[2])}${cel(labels[3], valores[3], cores[3])}
-      </tr></table>`;
-  }
+  const bodyXml = wPara("PROCEDIMENTO DE TRATAMENTO ADEQUADO AO CREDITO", { align: "center", bold: true, sz: 24, spacingAfter: 60 })
+    + wPara("P T A C", { align: "center", bold: true, sz: 26, spacingAfter: 80 })
+    + wPara("Procuradoria da Fazenda Publica - PROFAZ", { align: "center", sz: 18, spacingAfter: 30 })
+    + wPara("Procuradoria-Geral do Municipio de Fortaleza", { align: "center", sz: 18, spacingAfter: 160 })
+    + wPara("RELATORIO DE PTAC's", { align: "center", bold: true, sz: 22, spacingAfter: 60 })
+    + wPara("Referencia: " + tituloPeriodo, { align: "center", sz: 18, spacingAfter: 30 })
+    + wPara("Emitido em: " + hoje.toLocaleDateString("pt-BR"), { align: "center", sz: 18, spacingAfter: 200 })
+    + wPara("PTAC'S INSTAURADOS NO PERIODO", { bold: true, color: "0A8A7A", sz: 22, spacingBefore: 100, spacingAfter: 80 })
+    + seccaoTabela(instaurados, "DataInstauracao", "Data da instauracao", false)
+    + wPara("PTAC'S CONCLUIDOS NO PERIODO", { bold: true, color: "0A8A7A", sz: 22, spacingBefore: 200, spacingAfter: 80 })
+    + seccaoTabela(concluidos, "DataConclusao", "Data da conclusao", true)
+    + wPara("Fortaleza - CE, " + hoje.toLocaleDateString("pt-BR") + ".", { align: "center", spacingBefore: 400, sz: 18 })
+    + wPara("_______________________________________", { align: "center", spacingBefore: 600, sz: 18 })
+    + wPara("Raimundo Gomes de Almeida Neto", { align: "center", sz: 18, spacingAfter: 30 })
+    + wPara("Procurador do Municipio", { align: "center", sz: 18, spacingAfter: 30 })
+    + wPara("Mat. 121019-01", { align: "center", sz: 18, spacingAfter: 30 });
 
-  const html = `
-    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-    <head><meta charset="utf-8"><title>Relatorio PTAC</title></head>
-    <body style="font-family:Arial, sans-serif; color:#1a1f24">
-      <div style="text-align:center;margin-bottom:10px">
-        <img src="cid:logo_pgm_ptac">
-      </div>
-      <p style="text-align:center;font-weight:bold;font-size:15px;margin:4px 0">PROCEDIMENTO DE TRATAMENTO ADEQUADO AO CREDITO</p>
-      <p style="text-align:center;font-weight:bold;font-size:16px;margin:4px 0">P T A C</p>
-      <p style="text-align:center;font-size:11px;margin:2px 0">Procuradoria da Fazenda Publica - PROFAZ</p>
-      <p style="text-align:center;font-size:11px;margin:2px 0 14px">Procuradoria-Geral do Municipio de Fortaleza</p>
-      <p style="text-align:center;font-weight:bold;font-size:13px;margin:4px 0">RELATORIO DE PTAC's</p>
-      <p style="text-align:center;font-size:11px;margin:2px 0">Referencia: ${tituloPeriodo}</p>
-      <p style="text-align:center;font-size:11px;margin:2px 0 16px">Emitido em: ${hoje.toLocaleDateString("pt-BR")}</p>
+  const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
 
-      <p style="font-weight:bold;color:#0a8a7a;font-size:13px;margin:12px 0 4px">PTAC'S INSTAURADOS NO PERIODO</p>
-      ${linhasTabelaHtml(instaurados, "DataInstauracao", "Data da instauracao")}
-      ${resumoHtml(instaurados, ["PTAC's instaurados", "Total de CDAs", "Execucoes fiscais", "Saldo devedor total"], ["#185FA5", "#185FA5", "#E05020", "#0a8a7a"])}
+  const documentXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
+    + "<w:document " + NS + "><w:body>" + bodyXml
+    + '<w:sectPr><w:headerReference w:type="default" r:id="rId1"/><w:footerReference w:type="default" r:id="rId2"/>'
+    + '<w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr>'
+    + "</w:body></w:document>";
 
-      <p style="font-weight:bold;color:#0a8a7a;font-size:13px;margin:18px 0 4px">PTAC'S CONCLUIDOS NO PERIODO</p>
-      ${linhasTabelaHtml(concluidos, "DataConclusao", "Data da conclusao")}
-      ${resumoHtml(concluidos, ["PTAC's concluidos", "Total de CDAs", "Exec. fiscais extintas", "Creditos cancelados"], ["#0a8a7a", "#185FA5", "#E05020", "#0a8a7a"])}
+  const logoCx = 1645920, logoCy = 329184;   // 1.8in x 0.36in (logo 260x52)
+  const rodapeCx = 5943600, rodapeCy = 114300; // 6.5in x 0.125in (faixa 624x12)
 
-      <p style="text-align:center;margin-top:30px">Fortaleza - CE, ${hoje.toLocaleDateString("pt-BR")}.</p>
-      <p style="text-align:center;margin-top:40px">_______________________________________</p>
-      <p style="text-align:center;margin:2px 0">Raimundo Gomes de Almeida Neto</p>
-      <p style="text-align:center;margin:2px 0">Procurador do Municipio</p>
-      <p style="text-align:center;margin:2px 0 30px">Mat. 121019-01</p>
+  const header1Xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
+    + "<w:hdr " + NS + ">" + wImageInline("rId1", logoCx, logoCy, 1) + "</w:hdr>";
 
-      <hr style="border:none;border-top:1px solid #999;margin-bottom:6px">
-      <p style="font-weight:bold;font-size:10px;margin:2px 0">PROCURADORIA GERAL DO MUNICIPIO DE FORTALEZA</p>
-      <p style="font-size:9px;margin:2px 0">Rua Israel Bezerra, 570, Dionisio Torres. CEP 60135-460 Fortaleza - CE. Brasil.</p>
-      <img src="cid:rodape_pgm_ptac" style="margin-top:4px">
-    </body></html>`;
+  const footer1Xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
+    + "<w:ftr " + NS + ">"
+    + wPara("PROCURADORIA GERAL DO MUNICIPIO DE FORTALEZA", { bold: true, sz: 16, topBorder: true, spacingAfter: 20 })
+    + wPara("Rua Israel Bezerra, 570, Dionisio Torres. CEP 60135-460 Fortaleza - CE. Brasil.", { sz: 15, spacingAfter: 60 })
+    + wImageInline("rId1", rodapeCx, rodapeCy, 2)
+    + "</w:ftr>";
 
-  function quebrarBase64(b64) {
-    return b64.match(/.{1,76}/g).join("\r\n");
-  }
+  const stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
+    + '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+    + '<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="20"/></w:rPr></w:rPrDefault></w:docDefaults>'
+    + '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>'
+    + "</w:styles>";
 
-  const boundary = "----=_NextPart_PTAC_" + Date.now();
+  const contentTypesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
+    + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+    + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+    + '<Default Extension="xml" ContentType="application/xml"/>'
+    + '<Default Extension="png" ContentType="image/png"/>'
+    + '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+    + '<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>'
+    + '<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>'
+    + '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
+    + '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>'
+    + '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>'
+    + "</Types>";
+
+  const relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
+    + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
+    + '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>'
+    + '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>'
+    + "</Relationships>";
+
+  const documentRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
+    + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>'
+    + '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>'
+    + '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+    + "</Relationships>";
+
+  const header1RelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
+    + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/logo.png"/>'
+    + "</Relationships>";
+
+  const footer1RelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
+    + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/footerbar.png"/>'
+    + "</Relationships>";
+
+  const corePropsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
+    + '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/">'
+    + "<dc:title>Relatorio PTAC</dc:title><dc:creator>PROFAZ</dc:creator></cp:coreProperties>";
+
+  const appPropsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
+    + '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>PTAC Controle</Application></Properties>';
+
   const logoBase64Puro = LOGO_PGM_PTAC_WORD_B64.split(",")[1];
   const rodapeBase64Puro = RODAPE_PGM_PTAC_WORD_B64.split(",")[1];
 
-  const mht = [
-    "MIME-Version: 1.0",
-    "Content-Type: multipart/related; boundary=\"" + boundary + "\"",
-    "",
-    "--" + boundary,
-    "Content-Type: text/html; charset=\"utf-8\"",
-    "Content-Transfer-Encoding: 8bit",
-    "",
-    html,
-    "",
-    "--" + boundary,
-    "Content-Type: image/png",
-    "Content-Transfer-Encoding: base64",
-    "Content-ID: <logo_pgm_ptac>",
-    "",
-    quebrarBase64(logoBase64Puro),
-    "",
-    "--" + boundary,
-    "Content-Type: image/png",
-    "Content-Transfer-Encoding: base64",
-    "Content-ID: <rodape_pgm_ptac>",
-    "",
-    quebrarBase64(rodapeBase64Puro),
-    "",
-    "--" + boundary + "--"
-  ].join("\r\n");
+  const zip = new JSZip();
+  zip.file("[Content_Types].xml", contentTypesXml);
+  zip.folder("_rels").file(".rels", relsXml);
+  const wordFolder = zip.folder("word");
+  wordFolder.file("document.xml", documentXml);
+  wordFolder.file("styles.xml", stylesXml);
+  wordFolder.file("header1.xml", header1Xml);
+  wordFolder.file("footer1.xml", footer1Xml);
+  wordFolder.folder("_rels").file("document.xml.rels", documentRelsXml);
+  wordFolder.folder("_rels").file("header1.xml.rels", header1RelsXml);
+  wordFolder.folder("_rels").file("footer1.xml.rels", footer1RelsXml);
+  wordFolder.folder("media").file("logo.png", logoBase64Puro, { base64: true });
+  wordFolder.folder("media").file("footerbar.png", rodapeBase64Puro, { base64: true });
+  zip.folder("docProps").file("core.xml", corePropsXml);
+  zip.folder("docProps").file("app.xml", appPropsXml);
 
-  const blob = new Blob([mht], { type: "application/msword" });
+  const blob = await zip.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "Relatorio_PTAC_" + tituloPeriodo.replace(/ /g, "_") + ".doc";
+  a.download = "Relatorio_PTAC_" + tituloPeriodo.replace(/ /g, "_") + ".docx";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -634,7 +740,7 @@ async function gerarRelatorio(periodo) {
     const formato = radioFormato ? radioFormato.value : "pdf";
     const dadosRel = await obterDadosRelatorio(periodo);
     if (formato === "word") {
-      gerarRelatorioWord(dadosRel);
+      await gerarRelatorioDocx(dadosRel);
       document.getElementById("modal-relatorio").style.display = "none";
       status.textContent = "";
       return;
