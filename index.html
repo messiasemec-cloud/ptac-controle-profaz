@@ -517,61 +517,37 @@ function gerarRelatorioWord(dados) {
 
   const html = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-    <head>
-      <meta charset="utf-8"><title>Relatorio PTAC</title>
-      <style>
-        @page Section1 {
-          size: 8.5in 11.0in;
-          margin: 1.15in 1.0in 1.1in 1.0in;
-          mso-header: h1;
-          mso-header-margin: .4in;
-          mso-footer: f1;
-          mso-footer-margin: .5in;
-        }
-        div.Section1 { page: Section1; }
-        p.MsoHeader, li.MsoHeader, div.MsoHeader,
-        p.MsoFooter, li.MsoFooter, div.MsoFooter { margin: 0; font-size: 9px; font-family: Arial, sans-serif; color: #1a1f24; }
-      </style>
-    </head>
+    <head><meta charset="utf-8"><title>Relatorio PTAC</title></head>
     <body style="font-family:Arial, sans-serif; color:#1a1f24">
-
-      <div style="mso-element:header" id="h1">
-        <p class="MsoHeader" style="text-align:center">
-          <img src="cid:logo_pgm_ptac">
-        </p>
+      <div style="text-align:center;margin-bottom:10px">
+        <img src="cid:logo_pgm_ptac">
       </div>
+      <p style="text-align:center;font-weight:bold;font-size:15px;margin:4px 0">PROCEDIMENTO DE TRATAMENTO ADEQUADO AO CREDITO</p>
+      <p style="text-align:center;font-weight:bold;font-size:16px;margin:4px 0">P T A C</p>
+      <p style="text-align:center;font-size:11px;margin:2px 0">Procuradoria da Fazenda Publica - PROFAZ</p>
+      <p style="text-align:center;font-size:11px;margin:2px 0 14px">Procuradoria-Geral do Municipio de Fortaleza</p>
+      <p style="text-align:center;font-weight:bold;font-size:13px;margin:4px 0">RELATORIO DE PTAC's</p>
+      <p style="text-align:center;font-size:11px;margin:2px 0">Referencia: ${tituloPeriodo}</p>
+      <p style="text-align:center;font-size:11px;margin:2px 0 16px">Emitido em: ${hoje.toLocaleDateString("pt-BR")}</p>
 
-      <div style="mso-element:footer" id="f1">
-        <p class="MsoFooter" style="border-top:1px solid #999; padding-top:4px">
-          <b style="font-size:10px">PROCURADORIA GERAL DO MUNICIPIO DE FORTALEZA</b><br>
-          Rua Israel Bezerra, 570, Dionisio Torres. CEP 60135-460 Fortaleza - CE. Brasil.<br>
-          <img src="cid:rodape_pgm_ptac" style="margin-top:4px">
-        </p>
-      </div>
+      <p style="font-weight:bold;color:#0a8a7a;font-size:13px;margin:12px 0 4px">PTAC'S INSTAURADOS NO PERIODO</p>
+      ${linhasTabelaHtml(instaurados, "DataInstauracao", "Data da instauracao")}
+      ${resumoHtml(instaurados, ["PTAC's instaurados", "Total de CDAs", "Execucoes fiscais", "Saldo devedor total"], ["#185FA5", "#185FA5", "#E05020", "#0a8a7a"])}
 
-      <div class="Section1">
-        <p style="text-align:center;font-weight:bold;font-size:15px;margin:4px 0">PROCEDIMENTO DE TRATAMENTO ADEQUADO AO CREDITO</p>
-        <p style="text-align:center;font-weight:bold;font-size:16px;margin:4px 0">P T A C</p>
-        <p style="text-align:center;font-size:11px;margin:2px 0">Procuradoria da Fazenda Publica - PROFAZ</p>
-        <p style="text-align:center;font-size:11px;margin:2px 0 14px">Procuradoria-Geral do Municipio de Fortaleza</p>
-        <p style="text-align:center;font-weight:bold;font-size:13px;margin:4px 0">RELATORIO DE PTAC's</p>
-        <p style="text-align:center;font-size:11px;margin:2px 0">Referencia: ${tituloPeriodo}</p>
-        <p style="text-align:center;font-size:11px;margin:2px 0 16px">Emitido em: ${hoje.toLocaleDateString("pt-BR")}</p>
+      <p style="font-weight:bold;color:#0a8a7a;font-size:13px;margin:18px 0 4px">PTAC'S CONCLUIDOS NO PERIODO</p>
+      ${linhasTabelaHtml(concluidos, "DataConclusao", "Data da conclusao")}
+      ${resumoHtml(concluidos, ["PTAC's concluidos", "Total de CDAs", "Exec. fiscais extintas", "Creditos cancelados"], ["#0a8a7a", "#185FA5", "#E05020", "#0a8a7a"])}
 
-        <p style="font-weight:bold;color:#0a8a7a;font-size:13px;margin:12px 0 4px">PTAC'S INSTAURADOS NO PERIODO</p>
-        ${linhasTabelaHtml(instaurados, "DataInstauracao", "Data da instauracao")}
-        ${resumoHtml(instaurados, ["PTAC's instaurados", "Total de CDAs", "Execucoes fiscais", "Saldo devedor total"], ["#185FA5", "#185FA5", "#E05020", "#0a8a7a"])}
+      <p style="text-align:center;margin-top:30px">Fortaleza - CE, ${hoje.toLocaleDateString("pt-BR")}.</p>
+      <p style="text-align:center;margin-top:40px">_______________________________________</p>
+      <p style="text-align:center;margin:2px 0">Raimundo Gomes de Almeida Neto</p>
+      <p style="text-align:center;margin:2px 0">Procurador do Municipio</p>
+      <p style="text-align:center;margin:2px 0 30px">Mat. 121019-01</p>
 
-        <p style="font-weight:bold;color:#0a8a7a;font-size:13px;margin:18px 0 4px">PTAC'S CONCLUIDOS NO PERIODO</p>
-        ${linhasTabelaHtml(concluidos, "DataConclusao", "Data da conclusao")}
-        ${resumoHtml(concluidos, ["PTAC's concluidos", "Total de CDAs", "Exec. fiscais extintas", "Creditos cancelados"], ["#0a8a7a", "#185FA5", "#E05020", "#0a8a7a"])}
-
-        <p style="text-align:center;margin-top:30px">Fortaleza - CE, ${hoje.toLocaleDateString("pt-BR")}.</p>
-        <p style="text-align:center;margin-top:40px">_______________________________________</p>
-        <p style="text-align:center;margin:2px 0">Raimundo Gomes de Almeida Neto</p>
-        <p style="text-align:center;margin:2px 0">Procurador do Municipio</p>
-        <p style="text-align:center;margin:2px 0 30px">Mat. 121019-01</p>
-      </div>
+      <hr style="border:none;border-top:1px solid #999;margin-bottom:6px">
+      <p style="font-weight:bold;font-size:10px;margin:2px 0">PROCURADORIA GERAL DO MUNICIPIO DE FORTALEZA</p>
+      <p style="font-size:9px;margin:2px 0">Rua Israel Bezerra, 570, Dionisio Torres. CEP 60135-460 Fortaleza - CE. Brasil.</p>
+      <img src="cid:rodape_pgm_ptac" style="margin-top:4px">
     </body></html>`;
 
   function quebrarBase64(b64) {
@@ -654,7 +630,8 @@ async function gerarRelatorio(periodo) {
   const status = document.getElementById("relatorio-status");
   status.textContent = "Gerando relatorio...";
   try {
-    const formato = document.querySelector('input[name="relatorio-formato"]:checked').value;
+    const radioFormato = document.querySelector('input[name="relatorio-formato"]:checked');
+    const formato = radioFormato ? radioFormato.value : "pdf";
     const dadosRel = await obterDadosRelatorio(periodo);
     if (formato === "word") {
       gerarRelatorioWord(dadosRel);
@@ -852,6 +829,7 @@ async function gerarRelatorio(periodo) {
     doc.save("Relatorio_PTAC_" + tituloPeriodo.replace(/ /g, "_") + ".pdf");
     document.getElementById("modal-relatorio").style.display = "none";
   } catch (err) {
+    console.error("Erro ao gerar relatorio:", err);
     status.innerHTML = `<span style="color:#c0392b">Erro ao gerar: ${err.message}</span>`;
   }
 }
