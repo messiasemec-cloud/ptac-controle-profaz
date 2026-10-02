@@ -320,7 +320,16 @@ select:focus { border-color: var(--verde); }
     <div id="modal-relatorio" class="modal-overlay" style="display:none">
       <div class="modal-caixa" style="max-width:380px">
         <div class="modal-titulo">Gerar relatorio de PTAC</div>
-        <div class="modal-sub">Escolha o periodo de referencia do relatorio.</div>
+        <div class="modal-sub">Escolha o periodo e o formato do relatorio.</div>
+
+        <div style="display:flex;gap:16px;margin-bottom:14px;padding:10px 12px;background:var(--cinza-bg);border-radius:var(--radius)">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+            <input type="radio" name="relatorio-formato" value="pdf" checked> PDF
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+            <input type="radio" name="relatorio-formato" value="word"> Word (.doc)
+          </label>
+        </div>
 
         <div class="hipotese-item" style="cursor:default">
           <div class="hipotese-label" style="margin-bottom:8px">Mes especifico</div>
@@ -438,36 +447,160 @@ function desenharCardsResumo(doc, y0, mL, contentW, cards) {
   return y0 + ch;
 }
 
+function formatarDataBR(d) {
+  if (!d) return "-";
+  const dt = new Date(d);
+  if (isNaN(dt)) return "-";
+  return dt.toLocaleDateString("pt-BR");
+}
+
+function gerarRelatorioWord(dados) {
+  const { tituloPeriodo, instaurados, concluidos, hoje, periodo } = dados;
+
+  function linhasTabelaHtml(lista, campoData, cabecalhoData, subtotuloPrefixo) {
+    const th = (txt) => `<th style="background:#1F3864;color:#fff;padding:5px 6px;font-size:10px;border:1px solid #999">${txt}</th>`;
+    const cabecalho = `<tr>${th("Nome do contribuinte")}${th("CPF/CNPJ")}${th("No CDAs")}${th("Saldo devedor")}${th("Exec. fiscais")}${th("Hipotese normativa")}${th(cabecalhoData)}${th("Status")}</tr>`;
+
+    function linhasDe(sublista) {
+      if (sublista.length === 0) {
+        return `<tr><td colspan="8" style="padding:6px;border:1px solid #ccc;font-size:10px">Nenhum registro no periodo selecionado.</td></tr>`;
+      }
+      const corpo = sublista.map((c, i) => {
+        const info = hipoteseInfo(c.HipoteseIncidencia);
+        const bg = i % 2 === 1 ? "#F0F3F7" : "#FFFFFF";
+        const td = (txt, align) => `<td style="padding:5px 6px;border:1px solid #ccc;font-size:10px;background:${bg};${align ? "text-align:" + align : ""}">${txt}</td>`;
+        return `<tr>${td(c.Devedor || "")}${td(c.Documento || "")}${td(c.NumeroCDAs || 0, "center")}${td(fmt(saldoCasoPDF(c)), "right")}${td(c.NumeroExecucoesFiscais || 0, "center")}${td(info ? info.citacao : "Nao informada")}${td(formatarDataBR(c[campoData]), "center")}${td(c.Status || "")}</tr>`;
+      }).join("");
+      const totCdas = sublista.reduce((s, c) => s + (Number(c.NumeroCDAs) || 0), 0);
+      const totEf = sublista.reduce((s, c) => s + (Number(c.NumeroExecucoesFiscais) || 0), 0);
+      const totSaldo = sublista.reduce((s, c) => s + saldoCasoPDF(c), 0);
+      const tdT = (txt, align) => `<td style="padding:5px 6px;border:1px solid #ccc;font-size:10px;background:#FCE4D6;font-weight:bold;${align ? "text-align:" + align : ""}">${txt}</td>`;
+      const totalRow = `<tr>${tdT((subtotuloPrefixo || "TOTAL") + " (" + sublista.length + ")")}${tdT("")}${tdT(totCdas, "center")}${tdT(fmt(totSaldo), "right")}${tdT(totEf, "center")}${tdT("")}${tdT("")}${tdT("")}</tr>`;
+      return corpo + totalRow;
+    }
+
+    if (periodo === "ano" && lista.length > 0) {
+      const grupos = {};
+      lista.forEach(c => {
+        const dt = new Date(c[campoData]);
+        const chave = dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0");
+        (grupos[chave] = grupos[chave] || []).push(c);
+      });
+      return Object.keys(grupos).sort().map(chave => {
+        const [anoG, mesG] = chave.split("-").map(Number);
+        const nomeMes = NOMES_MESES_PT[mesG - 1] + " de " + anoG;
+        return `<p style="font-weight:bold;color:#E05020;font-size:12px;margin:10px 0 4px">${nomeMes}</p>
+          <table style="border-collapse:collapse;width:100%">${cabecalho}${linhasDe(grupos[chave])}</table>`;
+      }).join("");
+    }
+    return `<table style="border-collapse:collapse;width:100%">${cabecalho}${linhasDe(lista)}</table>`;
+  }
+
+  function resumoHtml(lista, labels, cores) {
+    const totCdas = lista.reduce((s, c) => s + (Number(c.NumeroCDAs) || 0), 0);
+    const totEf = lista.reduce((s, c) => s + (Number(c.NumeroExecucoesFiscais) || 0), 0);
+    const totSaldo = lista.reduce((s, c) => s + saldoCasoPDF(c), 0);
+    const valores = [lista.length, totCdas, totEf, fmt(totSaldo)];
+    const cel = (label, valor, cor) => `
+      <td style="width:25%;border:1px solid #ddd;border-radius:4px;padding:10px;text-align:center;vertical-align:top">
+        <div style="font-size:8.5px;color:#5a6472;text-transform:uppercase;margin-bottom:4px">${label}</div>
+        <div style="font-size:16px;font-weight:bold;color:${cor}">${valor}</div>
+      </td>`;
+    return `<p style="font-weight:bold;margin:14px 0 6px">RESUMO DO PERIODO</p>
+      <table style="border-collapse:separate;border-spacing:6px 0;width:100%"><tr>
+        ${cel(labels[0], valores[0], cores[0])}${cel(labels[1], valores[1], cores[1])}${cel(labels[2], valores[2], cores[2])}${cel(labels[3], valores[3], cores[3])}
+      </tr></table>`;
+  }
+
+  const html = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+    <head><meta charset="utf-8"><title>Relatorio PTAC</title></head>
+    <body style="font-family:Arial, sans-serif; color:#1a1f24">
+      <div style="text-align:center;margin-bottom:10px">
+        <img src="${LOGO_PGM_PTAC_B64}" style="width:260px">
+      </div>
+      <p style="text-align:center;font-weight:bold;font-size:15px;margin:4px 0">PROCEDIMENTO DE TRATAMENTO ADEQUADO AO CREDITO</p>
+      <p style="text-align:center;font-weight:bold;font-size:16px;margin:4px 0">P T A C</p>
+      <p style="text-align:center;font-size:11px;margin:2px 0">Procuradoria da Fazenda Publica - PROFAZ</p>
+      <p style="text-align:center;font-size:11px;margin:2px 0 14px">Procuradoria-Geral do Municipio de Fortaleza</p>
+      <p style="text-align:center;font-weight:bold;font-size:13px;margin:4px 0">RELATORIO DE PTAC's</p>
+      <p style="text-align:center;font-size:11px;margin:2px 0">Referencia: ${tituloPeriodo}</p>
+      <p style="text-align:center;font-size:11px;margin:2px 0 16px">Emitido em: ${hoje.toLocaleDateString("pt-BR")}</p>
+
+      <p style="font-weight:bold;color:#0a8a7a;font-size:13px;margin:12px 0 4px">PTAC'S INSTAURADOS NO PERIODO</p>
+      ${linhasTabelaHtml(instaurados, "DataInstauracao", "Data da instauracao")}
+      ${resumoHtml(instaurados, ["PTAC's instaurados", "Total de CDAs", "Execucoes fiscais", "Saldo devedor total"], ["#185FA5", "#185FA5", "#E05020", "#0a8a7a"])}
+
+      <p style="font-weight:bold;color:#0a8a7a;font-size:13px;margin:18px 0 4px">PTAC'S CONCLUIDOS NO PERIODO</p>
+      ${linhasTabelaHtml(concluidos, "DataConclusao", "Data da conclusao")}
+      ${resumoHtml(concluidos, ["PTAC's concluidos", "Total de CDAs", "Exec. fiscais extintas", "Creditos cancelados"], ["#0a8a7a", "#185FA5", "#E05020", "#0a8a7a"])}
+
+      <p style="text-align:center;margin-top:30px">Fortaleza - CE, ${hoje.toLocaleDateString("pt-BR")}.</p>
+      <p style="text-align:center;margin-top:40px">_______________________________________</p>
+      <p style="text-align:center;margin:2px 0">Raimundo Gomes de Almeida Neto</p>
+      <p style="text-align:center;margin:2px 0">Procurador do Municipio</p>
+      <p style="text-align:center;margin:2px 0 30px">Mat. 121019-01</p>
+
+      <hr style="border:none;border-top:1px solid #999;margin-bottom:6px">
+      <p style="font-weight:bold;font-size:10px;margin:2px 0">PROCURADORIA GERAL DO MUNICIPIO DE FORTALEZA</p>
+      <p style="font-size:9px;margin:2px 0">Rua Israel Bezerra, 570, Dionisio Torres. CEP 60135-460 Fortaleza - CE. Brasil.</p>
+      <img src="${RODAPE_PGM_PTAC_B64}" style="width:100%;height:10px;margin-top:4px">
+    </body></html>`;
+
+  const blob = new Blob(['\ufeff', html], { type: "application/msword" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "Relatorio_PTAC_" + tituloPeriodo.replace(/ /g, "_") + ".doc";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function obterDadosRelatorio(periodo) {
+  await carregarCasos();
+  const todosPtac = casos.filter(c => c.Fase === "PTAC");
+  const hoje = new Date();
+  let inicio, fim, tituloPeriodo;
+  if (periodo === "ano") {
+    inicio = new Date(hoje.getFullYear(), 0, 1);
+    fim = new Date(hoje.getFullYear(), 11, 31, 23, 59, 59);
+    tituloPeriodo = "Ano de " + hoje.getFullYear();
+  } else if (periodo === "todo") {
+    inicio = new Date(2000, 0, 1);
+    fim = new Date(2100, 0, 1);
+    tituloPeriodo = "Todo o periodo";
+  } else if (periodo === "mes_especifico") {
+    const valSel = document.getElementById("relatorio-select-mes").value;
+    const [ano, mes] = valSel.split("-").map(Number);
+    inicio = new Date(ano, mes - 1, 1);
+    fim = new Date(ano, mes, 0, 23, 59, 59);
+    tituloPeriodo = NOMES_MESES_PT[mes - 1] + " de " + ano;
+  } else {
+    inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    fim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59);
+    tituloPeriodo = NOMES_MESES_PT[hoje.getMonth()] + " de " + hoje.getFullYear();
+  }
+  const dentroPeriodo = (d) => { if (!d) return false; const dt = new Date(d); return dt >= inicio && dt <= fim; };
+  const instaurados = todosPtac.filter(c => dentroPeriodo(c.DataInstauracao));
+  const concluidos = todosPtac.filter(c => dentroPeriodo(c.DataConclusao));
+  return { tituloPeriodo, instaurados, concluidos, hoje, periodo };
+}
+
 async function gerarRelatorio(periodo) {
   const status = document.getElementById("relatorio-status");
   status.textContent = "Gerando relatorio...";
   try {
-    await carregarCasos();
-    const todosPtac = casos.filter(c => c.Fase === "PTAC");
-    const hoje = new Date();
-    let inicio, fim, tituloPeriodo;
-    if (periodo === "ano") {
-      inicio = new Date(hoje.getFullYear(), 0, 1);
-      fim = new Date(hoje.getFullYear(), 11, 31, 23, 59, 59);
-      tituloPeriodo = "Ano de " + hoje.getFullYear();
-    } else if (periodo === "todo") {
-      inicio = new Date(2000, 0, 1);
-      fim = new Date(2100, 0, 1);
-      tituloPeriodo = "Todo o periodo";
-    } else if (periodo === "mes_especifico") {
-      const valSel = document.getElementById("relatorio-select-mes").value;
-      const [ano, mes] = valSel.split("-").map(Number);
-      inicio = new Date(ano, mes - 1, 1);
-      fim = new Date(ano, mes, 0, 23, 59, 59);
-      tituloPeriodo = NOMES_MESES_PT[mes - 1] + " de " + ano;
-    } else {
-      inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-      fim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59);
-      tituloPeriodo = NOMES_MESES_PT[hoje.getMonth()] + " de " + hoje.getFullYear();
+    const formato = document.querySelector('input[name="relatorio-formato"]:checked').value;
+    const dadosRel = await obterDadosRelatorio(periodo);
+    if (formato === "word") {
+      gerarRelatorioWord(dadosRel);
+      document.getElementById("modal-relatorio").style.display = "none";
+      status.textContent = "";
+      return;
     }
-    const dentroPeriodo = (d) => { if (!d) return false; const dt = new Date(d); return dt >= inicio && dt <= fim; };
-    const instaurados = todosPtac.filter(c => dentroPeriodo(c.DataInstauracao));
-    const concluidos = todosPtac.filter(c => dentroPeriodo(c.DataConclusao));
+    const { tituloPeriodo, instaurados, concluidos, hoje } = dadosRel;
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -512,18 +645,34 @@ async function gerarRelatorio(periodo) {
       }
     }
 
-    const colsW = [52, 28, 16, 33, 19, contentW - (52 + 28 + 16 + 33 + 19)];
-    const colsLabel = ["Nome do contribuinte", "CPF/CNPJ", "No CDAs", "Saldo devedor", "Exec. fiscais", "Status"];
+    function montarColunas(labelData, campoData) {
+      const larguras = [34, 20, 11, 24, 13, 26, 15, 0];
+      larguras[7] = contentW - larguras.reduce((s, w) => s + w, 0);
+      return [
+        { label: "Nome do contribuinte", w: larguras[0], get: c => c.Devedor || "" },
+        { label: "CPF/CNPJ", w: larguras[1], get: c => c.Documento || "" },
+        { label: "No CDAs", w: larguras[2], get: c => String(c.NumeroCDAs || 0), total: "cdas" },
+        { label: "Saldo devedor", w: larguras[3], get: c => fmt(saldoCasoPDF(c)), total: "saldo" },
+        { label: "Exec. fiscais", w: larguras[4], get: c => String(c.NumeroExecucoesFiscais || 0), total: "ef" },
+        { label: "Hipotese normativa", w: larguras[5], get: c => (hipoteseInfo(c.HipoteseIncidencia) || {}).citacao || "Nao informada" },
+        { label: labelData, w: larguras[6], get: c => formatarDataBR(c[campoData]) },
+        { label: "Status", w: larguras[7], get: c => c.Status || "" }
+      ];
+    }
 
-    function desenharLinhasTabela(lista, subtotuloTotal) {
+    function desenharLinhasTabela(lista, cols, subtotuloTotal) {
       quebrarSeNecessario(8);
       doc.setFillColor(31, 56, 100);
       doc.rect(mL, y, contentW, 6, "F");
-      doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(7);
+      doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(6.5);
       let cx = mL;
-      colsLabel.forEach((lbl, i) => { doc.text(lbl, cx + 1.5, y + 4); cx += colsW[i]; });
+      cols.forEach(col => {
+        const lbl = doc.splitTextToSize(col.label, col.w - 2);
+        doc.text(lbl, cx + 1.3, lbl.length > 1 ? y + 2.6 : y + 4);
+        cx += col.w;
+      });
       y += 6;
-      doc.setTextColor(26, 31, 36); doc.setFont("helvetica", "normal"); doc.setFontSize(7);
+      doc.setTextColor(26, 31, 36); doc.setFont("helvetica", "normal"); doc.setFontSize(6.5);
 
       if (lista.length === 0) {
         quebrarSeNecessario(6);
@@ -531,23 +680,17 @@ async function gerarRelatorio(periodo) {
         y += 6;
       } else {
         lista.forEach((c, i) => {
-          quebrarSeNecessario(6);
-          if (i % 2 === 1) { doc.setFillColor(240, 243, 247); doc.rect(mL, y, contentW, 6, "F"); }
-          const vals = [
-            c.Devedor || "",
-            c.Documento || "",
-            String(c.NumeroCDAs || 0),
-            fmt(saldoCasoPDF(c)),
-            String(c.NumeroExecucoesFiscais || 0),
-            c.Status || ""
-          ];
+          const linhasPorCol = cols.map(col => doc.splitTextToSize(String(col.get(c)), col.w - 2.6));
+          const maxLinhas = Math.max(...linhasPorCol.map(l => l.length), 1);
+          const rowH = Math.max(6, maxLinhas * 2.9 + 2.6);
+          quebrarSeNecessario(rowH);
+          if (i % 2 === 1) { doc.setFillColor(240, 243, 247); doc.rect(mL, y, contentW, rowH, "F"); }
           let cx2 = mL;
-          vals.forEach((v, vi) => {
-            const txt = doc.splitTextToSize(String(v), colsW[vi] - 3)[0] || "";
-            doc.text(txt, cx2 + 1.5, y + 4);
-            cx2 += colsW[vi];
+          cols.forEach((col, vi) => {
+            doc.text(linhasPorCol[vi], cx2 + 1.3, y + 3.3);
+            cx2 += col.w;
           });
-          y += 6;
+          y += rowH;
         });
       }
 
@@ -557,11 +700,17 @@ async function gerarRelatorio(periodo) {
       quebrarSeNecessario(8);
       doc.setFillColor(252, 228, 214);
       doc.rect(mL, y, contentW, 6.5, "F");
-      doc.setFont("helvetica", "bold"); doc.setFontSize(7.5);
-      doc.text((subtotuloTotal || "TOTAL") + " (" + lista.length + ")", mL + 1.5, y + 4.3);
-      doc.text(String(totCdas), mL + colsW[0] + colsW[1] + 1.5, y + 4.3);
-      doc.text(fmt(totSaldo), mL + colsW[0] + colsW[1] + colsW[2] + 1.5, y + 4.3);
-      doc.text(String(totEf), mL + colsW[0] + colsW[1] + colsW[2] + colsW[3] + 1.5, y + 4.3);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(7);
+      let cx3 = mL;
+      cols.forEach(col => {
+        let txt = "";
+        if (col.total === "cdas") txt = String(totCdas);
+        else if (col.total === "saldo") txt = fmt(totSaldo);
+        else if (col.total === "ef") txt = String(totEf);
+        else if (col === cols[0]) txt = (subtotuloTotal || "TOTAL") + " (" + lista.length + ")";
+        doc.text(txt, cx3 + 1.3, y + 4.3);
+        cx3 += col.w;
+      });
       y += 6.5 + 6;
       doc.setFont("helvetica", "normal");
       return { totCdas, totEf, totSaldo };
@@ -584,11 +733,13 @@ async function gerarRelatorio(periodo) {
       y = desenharCardsResumo(doc, y, mL, contentW, cards) + 10;
     }
 
-    function desenharSecao(titulo, lista, campoData, labelsResumo, coresResumo) {
+    function desenharSecao(titulo, lista, campoData, labelData, labelsResumo, coresResumo) {
       quebrarSeNecessario(16);
       doc.setFont("helvetica", "bold"); doc.setFontSize(10);
       doc.setTextColor(10, 138, 122);
       doc.text(titulo, mL, y); y += 5;
+
+      const cols = montarColunas(labelData, campoData);
 
       if (periodo === "ano" && lista.length > 0) {
         const grupos = {};
@@ -603,23 +754,23 @@ async function gerarRelatorio(periodo) {
           doc.setFont("helvetica", "bold"); doc.setFontSize(8.5);
           doc.setTextColor(224, 80, 32);
           doc.text(NOMES_MESES_PT[mesG - 1] + " de " + anoG, mL, y); y += 4.5;
-          desenharLinhasTabela(grupos[chave], "Subtotal " + NOMES_MESES_PT[mesG - 1]);
+          desenharLinhasTabela(grupos[chave], cols, "Subtotal " + NOMES_MESES_PT[mesG - 1]);
         });
         y += 2;
       } else {
-        desenharLinhasTabela(lista);
+        desenharLinhasTabela(lista, cols);
       }
 
       desenharResumoDaSecao(lista, labelsResumo, coresResumo);
     }
 
     desenharSecao(
-      "PTAC'S INSTAURADOS NO PERIODO", instaurados, "DataInstauracao",
+      "PTAC'S INSTAURADOS NO PERIODO", instaurados, "DataInstauracao", "Data da instauracao",
       ["PTAC's instaurados", "Total de CDAs", "Execucoes fiscais", "Saldo devedor total"],
       [[24, 95, 165], [24, 95, 165], [224, 80, 32], [10, 138, 122]]
     );
     desenharSecao(
-      "PTAC'S CONCLUIDOS NO PERIODO", concluidos, "DataConclusao",
+      "PTAC'S CONCLUIDOS NO PERIODO", concluidos, "DataConclusao", "Data da conclusao",
       ["PTAC's concluidos", "Total de CDAs", "Exec. fiscais extintas", "Creditos cancelados"],
       [[10, 138, 122], [24, 95, 165], [224, 80, 32], [10, 138, 122]]
     );
