@@ -517,24 +517,8 @@ function gerarRelatorioWord(dados) {
 
   const html = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-    <head>
-      <meta charset="utf-8">
-      <title>Relatorio PTAC</title>
-      <style>
-        @page { margin: 1.0in 1.0in 1.1in 1.0in; mso-footer: f1; mso-footer-margin: .5in; }
-        p.MsoFooter, div.MsoFooter { margin: 0; font-size: 9px; font-family: Arial, sans-serif; color: #1a1f24; }
-      </style>
-    </head>
+    <head><meta charset="utf-8"><title>Relatorio PTAC</title></head>
     <body style="font-family:Arial, sans-serif; color:#1a1f24">
-
-      <div style="mso-element:footer" id="f1">
-        <p class="MsoFooter" style="border-top:1px solid #999; padding-top:4px">
-          <b style="font-size:10px">PROCURADORIA GERAL DO MUNICIPIO DE FORTALEZA</b><br>
-          Rua Israel Bezerra, 570, Dionisio Torres. CEP 60135-460 Fortaleza - CE. Brasil.<br>
-          <img src="cid:rodape_pgm_ptac" style="margin-top:4px">
-        </p>
-      </div>
-
       <div style="text-align:center;margin-bottom:10px">
         <img src="cid:logo_pgm_ptac">
       </div>
@@ -559,6 +543,11 @@ function gerarRelatorioWord(dados) {
       <p style="text-align:center;margin:2px 0">Raimundo Gomes de Almeida Neto</p>
       <p style="text-align:center;margin:2px 0">Procurador do Municipio</p>
       <p style="text-align:center;margin:2px 0 30px">Mat. 121019-01</p>
+
+      <hr style="border:none;border-top:1px solid #999;margin-bottom:6px">
+      <p style="font-weight:bold;font-size:10px;margin:2px 0">PROCURADORIA GERAL DO MUNICIPIO DE FORTALEZA</p>
+      <p style="font-size:9px;margin:2px 0">Rua Israel Bezerra, 570, Dionisio Torres. CEP 60135-460 Fortaleza - CE. Brasil.</p>
+      <img src="cid:rodape_pgm_ptac" style="margin-top:4px">
     </body></html>`;
 
   function quebrarBase64(b64) {
