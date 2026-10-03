@@ -78,9 +78,14 @@ select:focus { border-color: var(--verde); }
 /* BUSCA / LISTA DE CASOS */
 .btn-buscar { width: 100%; padding: 12px; background: var(--verde); color: var(--branco); border: none; border-radius: var(--radius); font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
 .btn-buscar:hover { background: var(--verde-escuro); }
-.lista-row { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--cinza-borda); cursor: pointer; transition: background .12s; border-radius: 6px; }
+.lista-row { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--cinza-borda); cursor: pointer; transition: background .12s; border-radius: 6px; border-left: 3px solid transparent; }
 .lista-row:hover { background: rgba(10,138,122,.05); }
 .lista-row:last-child { border-bottom: none; }
+.lista-row.concluido { background: #f1f9f6; border-left-color: var(--verde); }
+.lista-row.concluido:hover { background: #e6f4ee; }
+.lista-acoes { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.btn-capa { background: none; border: none; cursor: pointer; padding: 3px; border-radius: 4px; color: var(--texto-sec); display: flex; align-items: center; justify-content: center; }
+.btn-capa:hover { background: rgba(0,0,0,.07); color: var(--verde-escuro); }
 .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--verde); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
 .lista-nome { font-size: 13px; font-weight: 600; color: var(--texto); }
 .lista-sub { font-size: 12px; color: var(--texto-sec); margin-top: 2px; }
@@ -189,7 +194,6 @@ select:focus { border-color: var(--verde); }
     <div class="abas">
       <button class="aba ativa" id="nav-painel" onclick="mostrarPagina('painel')">Painel geral</button>
       <button class="aba" id="nav-andamento" onclick="mostrarPagina('andamento')">Andamento</button>
-      <button class="aba" id="nav-progresso" onclick="mostrarPagina('progresso')">Progresso</button>
       <button class="aba" id="nav-entrada" onclick="mostrarPagina('entrada')">Nova entrada</button>
     </div>
   </div>
@@ -355,14 +359,6 @@ select:focus { border-color: var(--verde); }
       </div>
     </div>
 
-    <!-- PAGINA: PROGRESSO -->
-    <div id="page-progresso" class="page">
-      <div class="painel-card">
-        <div class="painel-titulo">Progresso por devedor</div>
-        <div id="tabela-painel"></div>
-      </div>
-    </div>
-
   </div>
 
 <script>
@@ -404,6 +400,82 @@ function saldoCasoPDF(c) {
 }
 
 const NOMES_MESES_PT = ["Janeiro","Fevereiro","Marco","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+
+function gerarCapaPTAC(casoId) {
+  const c = casos.find(x => String(x.ID) === String(casoId));
+  if (!c) return;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pW = 210, pH = 297;
+  const mL = 18, mR = 18;
+  const contentW = pW - mL - mR;
+  let y = 14;
+
+  const logoW = 70, logoH = 14.1;
+  doc.addImage(LOGO_PGM_PTAC_B64, "PNG", (pW - logoW) / 2, y, logoW, logoH);
+  y += 22;
+
+  doc.setTextColor(26, 31, 36);
+  doc.setFont("helvetica", "bold"); doc.setFontSize(13);
+  doc.text("PROCEDIMENTO DE TRATAMENTO", pW / 2, y, { align: "center" }); y += 6;
+  doc.text("ADEQUADO AO CREDITO", pW / 2, y, { align: "center" }); y += 9;
+  doc.setFontSize(18);
+  doc.text("PTAC", pW / 2, y, { align: "center" }); y += 10;
+
+  doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+  doc.text("Procuradoria da Fazenda Publica - PROFAZ", pW / 2, y, { align: "center" }); y += 5;
+  doc.setFont("helvetica", "normal");
+  doc.text("Procuradoria-Geral do Municipio de Fortaleza", pW / 2, y, { align: "center" }); y += 14;
+
+  doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+  doc.setTextColor(26, 31, 36);
+  doc.text("IDENTIFICACAO DO DEVEDOR", mL, y); y += 6;
+
+  const linhaH = 9;
+  const colLabelW = 50;
+  function linhaIdent(label, valor) {
+    doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.3);
+    doc.setFillColor(240, 243, 247);
+    doc.rect(mL, y, colLabelW, linhaH, "FD");
+    doc.rect(mL + colLabelW, y, contentW - colLabelW, linhaH);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(26, 31, 36);
+    doc.text(label, mL + 2, y + 6);
+    doc.setFont("helvetica", "normal");
+    doc.text(String(valor), mL + colLabelW + 2, y + 6);
+    y += linhaH;
+  }
+  linhaIdent("Nome do devedor", c.Devedor || "");
+  linhaIdent("CPF/CNPJ", c.Documento || "");
+  y += 10;
+
+  doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+  doc.text("RESUMO CONSOLIDADO", mL, y); y += 6;
+
+  const saldo = saldoCasoPDF(c);
+  const cards = [
+    { label: "Total de CDAs", valor: c.NumeroCDAs || 0, cor: [41, 171, 226] },
+    { label: "Execucoes fiscais em curso", valor: c.NumeroExecucoesFiscais || 0, cor: [52, 73, 94] },
+    { label: "Saldo devedor consolidado", valor: fmt(saldo), cor: [224, 80, 32] }
+  ];
+  y = desenharCardsResumo(doc, y, mL, contentW, cards) + 20;
+
+  const hoje = new Date();
+  const meses = ["janeiro", "fevereiro", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+  const dataExtenso = hoje.getDate() + " de " + meses[hoje.getMonth()] + " de " + hoje.getFullYear();
+  doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(26, 31, 36);
+  doc.text("Fortaleza - CE, " + dataExtenso, pW / 2, y, { align: "center" });
+
+  doc.setTextColor(26, 31, 36);
+  doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+  doc.text("PROCURADORIA GERAL DO MUNICIPIO DE FORTALEZA", mL, pH - 16);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(7.5);
+  doc.text("Rua Israel Bezerra, 570, Dionisio Torres. CEP 60135-460 Fortaleza - CE. Brasil.", mL, pH - 12);
+  doc.addImage(RODAPE_PGM_PTAC_B64, "PNG", 0, pH - 4, pW, 3.3);
+
+  const nomeArquivo = "Capa_PTAC_" + (c.Devedor || "devedor").replace(/[^a-zA-Z0-9]+/g, "_") + ".pdf";
+  doc.save(nomeArquivo);
+}
 
 async function abrirModalRelatorio() {
   document.getElementById("relatorio-status").textContent = "Carregando meses...";
@@ -1054,13 +1126,12 @@ async function api(acao, params, tentativa) {
 async function carregarCasos() { casos = await api("listarCasos"); }
 
 function mostrarPagina(nome) {
-  ["entrada","andamento","painel","progresso"].forEach(p => {
+  ["entrada","andamento","painel"].forEach(p => {
     document.getElementById("page-"+p).classList.toggle("active", p===nome);
     document.getElementById("nav-"+p).classList.toggle("ativa", p===nome);
   });
   if (nome === "andamento") { carregarCasos().then(renderBusca); }
   if (nome === "painel") { renderPainel(); }
-  if (nome === "progresso") { renderPainel(); }
 }
 
 async function registrarCaso() {
@@ -1165,6 +1236,7 @@ function renderBusca() {
 
   let visiveis = casos.filter(c => c.Devedor.toLowerCase().includes(termo));
   if (filtroEixoAndamento) visiveis = visiveis.filter(c => c.Eixo === filtroEixoAndamento);
+  visiveis = [...visiveis].sort((a, b) => saldoCaso(b) - saldoCaso(a));
 
   if (listaFocoId !== null) {
     visiveis = visiveis.filter(c => c.ID === listaFocoId);
@@ -1175,17 +1247,38 @@ function renderBusca() {
     lista.appendChild(voltar);
   }
 
+  const ICONE_DOWNLOAD = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+
   visiveis.forEach(c => {
     const row = document.createElement("div");
-    row.className = "lista-row";
+    const concluido = (c.Status === "Concluido" || c.Status === "Concluido/Extinto");
+    row.className = "lista-row" + (concluido ? " concluido" : "");
     row.onclick = () => { casoSelecionado = c.ID; listaFocoId = c.ID; renderBusca(); renderFicha(); };
-    const bc = badgeClasse[c.Status] || "badge-identificado";
+
+    const corFase = corPorFasePTAC[c.Status];
+    const selo = corFase
+      ? `<span class="selo-fase" style="background:${corFase.bg};color:${corFase.texto}">${c.Status}</span>`
+      : `<span class="badge ${badgeClasse[c.Status] || "badge-identificado"}">${c.Status}</span>`;
+
+    const saldoDevedor = saldoCaso(c);
+    const nCdas = c.NumeroCDAs || 0;
+    const nExec = c.NumeroExecucoesFiscais || 0;
+    const linhaValor = `${fmt(saldoDevedor)} · ${nExec} execucoes · ${nCdas} CDAs`;
+
+    const hInfo = hipoteseInfo(c.HipoteseIncidencia);
+
     row.innerHTML = `
       <div class="avatar">${iniciais(c.Devedor)}</div>
-      <div style="flex:1">
-        <div class="lista-nome">${c.Devedor}${c.Documento ? ` <span style="font-weight:400;color:var(--texto-sec);font-size:12px">- ${c.Documento}</span>` : ""} <span style="font-weight:400;color:var(--texto-sec);font-size:12px">· ${hipoteseInfo(c.HipoteseIncidencia) ? hipoteseInfo(c.HipoteseIncidencia).citacao : "Hipotese nao informada"}</span></div>
+      <div style="flex:1;min-width:0">
+        <div class="lista-nome">${c.Devedor}${c.Documento ? ` <span style="font-weight:400;color:var(--texto-sec);font-size:12px">- ${c.Documento}</span>` : ""} <span style="font-weight:400;color:var(--texto-sec);font-size:12px">· ${hInfo ? hInfo.citacao : "Hipotese nao informada"}</span></div>
+        <div style="font-size:13px;font-weight:600;color:var(--verde-escuro);margin-top:3px">${linhaValor}</div>
       </div>
-      <span class="badge ${bc}">${c.Status}</span>`;
+      <div class="lista-acoes">
+        ${selo}
+        <button class="btn-capa" title="Gerar Capa PTAC">${ICONE_DOWNLOAD}</button>
+      </div>`;
+
+    row.querySelector(".btn-capa").onclick = (e) => { e.stopPropagation(); gerarCapaPTAC(c.ID); };
     lista.appendChild(row);
   });
 
@@ -1609,49 +1702,6 @@ async function renderPainel() {
   document.getElementById("kpi-cdas-concluido").textContent = numFmt(painel.cdasConcluido);
   document.getElementById("kpi-cdas-total-instaurado").textContent = numFmt(painel.cdasEmCurso + painel.cdasConcluido);
   document.getElementById("barra-cdas").innerHTML = barraDuasCoresHtml(painel.cdasEmCurso, painel.cdasConcluido, numFmt);
-
-  const tabela = document.getElementById("tabela-painel");
-  tabela.innerHTML = "";
-  const casosOrdenados = [...painel.casos].sort((a, b) => saldoCaso(b) - saldoCaso(a));
-  const totalInstauradoGeral = painel.saldoEmCurso + painel.saldoConcluido;
-  casosOrdenados.forEach(c => {
-    const detalhado = (c.bens||[]).length > 0;
-    const saldoDevedor = saldoCaso(c);
-    const concluido = (c.Status === "Concluido" || c.Status === "Concluido/Extinto");
-    const corFase = corPorFasePTAC[c.Status];
-    const row = document.createElement("div");
-    row.className = "prog-row" + (concluido ? " concluido" : "");
-    let linhaValor;
-    if (saldoDevedor > 0) {
-      const partes = [fmt(saldoDevedor)];
-      const nCdas = c.NumeroCDAs || null;
-      const nExec = c.NumeroExecucoesFiscais || (detalhado ? c.bens.filter(b => b.Tipo === "execucao").length : null);
-      if (nExec) partes.push(`${nExec} execucoes`);
-      if (nCdas) partes.push(`${nCdas} CDAs`);
-      if (!nExec && !nCdas && detalhado) partes.push(`${c.bens.length} itens`);
-      linhaValor = partes.join(" · ");
-      if (totalInstauradoGeral > 0) {
-        const pctDoTotal = (saldoDevedor / totalInstauradoGeral) * 100;
-        linhaValor += ` · ${pctDoTotal.toFixed(1)}% do total instaurado`;
-      }
-    } else {
-      linhaValor = "sem dado cadastrado";
-    }
-    const selo = corFase
-      ? `<span class="selo-fase" style="background:${corFase.bg};color:${corFase.texto}">${c.Status}</span>`
-      : `<span class="badge ${badgeClasse[c.Status] || "badge-identificado"}">${c.Status}</span>`;
-    row.innerHTML = `
-      <div class="prog-topo">
-        <div>
-          <span style="font-weight:600;font-size:13px">${c.Devedor}</span>${c.Documento ? ` <span style="font-weight:400;color:var(--texto-sec);font-size:12px">- ${c.Documento}</span>` : ""}
-        </div>
-        <div style="display:flex;gap:6px;align-items:center">
-          ${selo}
-        </div>
-      </div>
-      <div style="font-size:15px;font-weight:600;color:var(--verde-escuro)">${linhaValor}</div>`;
-    tabela.appendChild(row);
-  });
 }
 
 renderPainel();
