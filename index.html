@@ -562,7 +562,23 @@ async function gerarRelatorioDocx(dados) {
       + "<w:tr>" + cells + "</w:tr></w:tbl>" + wPara("", { spacingAfter: 160 });
   }
 
-  function seccaoTabela(lista, campoData, labelData, concluido) {
+  function textoResumoDocx(lista, tipo) {
+    const totCdas = lista.reduce((s, c) => s + (Number(c.NumeroCDAs) || 0), 0);
+    const totEf = lista.reduce((s, c) => s + (Number(c.NumeroExecucoesFiscais) || 0), 0);
+    const totSaldo = lista.reduce((s, c) => s + saldoCasoPDF(c), 0);
+    const n = lista.length;
+    const sufixoPtac = n === 1 ? "PTAC" : "PTAC's";
+    if (tipo === "concluido") {
+      const verbo = n === 1 ? "foi concluido" : "foram concluidos";
+      return "No periodo de referencia " + verbo + " " + n + " " + sufixoPtac + ", totalizando " + fmt(totSaldo) + " em creditos cancelados e " + totEf + " execucoes fiscais extintas.";
+    }
+    const verbo = n === 1 ? "foi instaurado" : "foram instaurados";
+    return "No periodo de referencia " + verbo + " " + n + " " + sufixoPtac + ", totalizando " + totCdas + " CDAs e " + totEf + " execucoes fiscais, com saldo devedor consolidado de " + fmt(totSaldo) + ".";
+  }
+
+  function seccaoTabela(titulo, lista, campoData, labelData, concluido) {
+    if (lista.length === 0) return "";
+    const tituloXml = wPara(titulo, { bold: true, color: "0A8A7A", sz: 22, spacingBefore: 100, spacingAfter: 80 });
     let tabelasXml;
     if (periodo === "ano" && lista.length > 0) {
       const grupos = {};
@@ -581,7 +597,11 @@ async function gerarRelatorioDocx(dados) {
     }
     const labels = concluido ? ["PTAC's concluidos", "Total de CDAs", "Exec. fiscais extintas", "Creditos cancelados"] : ["PTAC's instaurados", "Total de CDAs", "Execucoes fiscais", "Saldo devedor total"];
     const cores = concluido ? ["0A8A7A", "185FA5", "E05020", "0A8A7A"] : ["185FA5", "185FA5", "E05020", "0A8A7A"];
-    return tabelasXml + wPara("RESUMO DO PERIODO", { bold: true, sz: 18, spacingBefore: 160, spacingAfter: 60 }) + resumoDocx(lista, labels, cores);
+    const tipo = concluido ? "concluido" : "instaurado";
+    return tituloXml + tabelasXml
+      + wPara("RESUMO DO PERIODO", { bold: true, sz: 18, spacingBefore: 160, spacingAfter: 60 })
+      + wPara(textoResumoDocx(lista, tipo), { sz: 16, spacingAfter: 140 })
+      + resumoDocx(lista, labels, cores);
   }
 
   const bodyXml = wPara("PROCEDIMENTO DE TRATAMENTO ADEQUADO AO CREDITO", { align: "center", bold: true, sz: 24, spacingAfter: 60 })
@@ -591,10 +611,8 @@ async function gerarRelatorioDocx(dados) {
     + wPara("RELATORIO DE PTAC's", { align: "center", bold: true, sz: 22, spacingAfter: 60 })
     + wPara("Referencia: " + tituloPeriodo, { align: "center", sz: 18, spacingAfter: 30 })
     + wPara("Emitido em: " + hoje.toLocaleDateString("pt-BR"), { align: "center", sz: 18, spacingAfter: 200 })
-    + wPara("PTAC'S INSTAURADOS NO PERIODO", { bold: true, color: "0A8A7A", sz: 22, spacingBefore: 100, spacingAfter: 80 })
-    + seccaoTabela(instaurados, "DataInstauracao", "Data da instauracao", false)
-    + wPara("PTAC'S CONCLUIDOS NO PERIODO", { bold: true, color: "0A8A7A", sz: 22, spacingBefore: 200, spacingAfter: 80 })
-    + seccaoTabela(concluidos, "DataConclusao", "Data da conclusao", true)
+    + seccaoTabela("PTAC'S INSTAURADOS NO PERIODO", instaurados, "DataInstauracao", "Data da instauracao", false)
+    + seccaoTabela("PTAC'S CONCLUIDOS NO PERIODO", concluidos, "DataConclusao", "Data da conclusao", true)
     + wPara("Fortaleza - CE, " + hoje.toLocaleDateString("pt-BR") + ".", { align: "center", spacingBefore: 400, sz: 18 })
     + wPara("_______________________________________", { align: "center", spacingBefore: 600, sz: 18 })
     + wPara("Raimundo Gomes de Almeida Neto", { align: "center", sz: 18, spacingAfter: 30 })
@@ -866,11 +884,32 @@ async function gerarRelatorio(periodo) {
       return { totCdas, totEf, totSaldo };
     }
 
-    function desenharResumoDaSecao(lista, labels, cores) {
+    function textoResumo(lista, tipo) {
+      const totCdas = lista.reduce((s, c) => s + (Number(c.NumeroCDAs) || 0), 0);
+      const totEf = lista.reduce((s, c) => s + (Number(c.NumeroExecucoesFiscais) || 0), 0);
+      const totSaldo = lista.reduce((s, c) => s + saldoCasoPDF(c), 0);
+      const n = lista.length;
+      const sufixoPtac = n === 1 ? "PTAC" : "PTAC's";
+      if (tipo === "concluido") {
+        const verbo = n === 1 ? "foi concluido" : "foram concluidos";
+        return "No periodo de referencia " + verbo + " " + n + " " + sufixoPtac + ", totalizando " + fmt(totSaldo) + " em creditos cancelados e " + totEf + " execucoes fiscais extintas.";
+      }
+      const verbo = n === 1 ? "foi instaurado" : "foram instaurados";
+      return "No periodo de referencia " + verbo + " " + n + " " + sufixoPtac + ", totalizando " + totCdas + " CDAs e " + totEf + " execucoes fiscais, com saldo devedor consolidado de " + fmt(totSaldo) + ".";
+    }
+
+    function desenharResumoDaSecao(lista, labels, cores, tipo) {
       quebrarSeNecessario(20);
       doc.setFont("helvetica", "bold"); doc.setFontSize(9);
       doc.setTextColor(26, 31, 36);
-      doc.text("RESUMO DO PERIODO", mL, y); y += 4;
+      doc.text("RESUMO DO PERIODO", mL, y); y += 5;
+
+      doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+      const linhasTexto = doc.splitTextToSize(textoResumo(lista, tipo), contentW);
+      quebrarSeNecessario(linhasTexto.length * 4 + 6);
+      doc.text(linhasTexto, mL, y);
+      y += linhasTexto.length * 4 + 6;
+
       const totCdas = lista.reduce((s, c) => s + (Number(c.NumeroCDAs) || 0), 0);
       const totEf = lista.reduce((s, c) => s + (Number(c.NumeroExecucoesFiscais) || 0), 0);
       const totSaldo = lista.reduce((s, c) => s + saldoCasoPDF(c), 0);
@@ -883,7 +922,8 @@ async function gerarRelatorio(periodo) {
       y = desenharCardsResumo(doc, y, mL, contentW, cards) + 10;
     }
 
-    function desenharSecao(titulo, lista, campoData, labelData, labelsResumo, coresResumo) {
+    function desenharSecao(titulo, lista, campoData, labelData, labelsResumo, coresResumo, tipo) {
+      if (lista.length === 0) return;
       quebrarSeNecessario(16);
       doc.setFont("helvetica", "bold"); doc.setFontSize(10);
       doc.setTextColor(10, 138, 122);
@@ -911,18 +951,20 @@ async function gerarRelatorio(periodo) {
         desenharLinhasTabela(lista, cols);
       }
 
-      desenharResumoDaSecao(lista, labelsResumo, coresResumo);
+      desenharResumoDaSecao(lista, labelsResumo, coresResumo, tipo);
     }
 
     desenharSecao(
       "PTAC'S INSTAURADOS NO PERIODO", instaurados, "DataInstauracao", "Data da instauracao",
       ["PTAC's instaurados", "Total de CDAs", "Execucoes fiscais", "Saldo devedor total"],
-      [[24, 95, 165], [24, 95, 165], [224, 80, 32], [10, 138, 122]]
+      [[24, 95, 165], [24, 95, 165], [224, 80, 32], [10, 138, 122]],
+      "instaurado"
     );
     desenharSecao(
       "PTAC'S CONCLUIDOS NO PERIODO", concluidos, "DataConclusao", "Data da conclusao",
       ["PTAC's concluidos", "Total de CDAs", "Exec. fiscais extintas", "Creditos cancelados"],
-      [[10, 138, 122], [24, 95, 165], [224, 80, 32], [10, 138, 122]]
+      [[10, 138, 122], [24, 95, 165], [224, 80, 32], [10, 138, 122]],
+      "concluido"
     );
 
     quebrarSeNecessario(30);
