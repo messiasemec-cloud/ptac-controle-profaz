@@ -528,6 +528,8 @@ function gerarCapaPTAC(casoId) {
   doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(26, 31, 36);
   doc.text("Fortaleza - CE, " + dataExtenso, pW / 2, y, { align: "center" });
 
+  doc.setFont("helvetica", "italic"); doc.setFontSize(6.5); doc.setTextColor(120, 128, 138);
+  doc.text("Relatorio gerado por sistema desenvolvido por Emanuel Sales - Analista da PGM - PROFAZ", pW - mR, pH - 20, { align: "right" });
   doc.setTextColor(26, 31, 36);
   doc.setFont("helvetica", "bold"); doc.setFontSize(8);
   doc.text("PROCURADORIA GERAL DO MUNICIPIO DE FORTALEZA", mL, pH - 16);
@@ -926,6 +928,8 @@ async function gerarRelatorio(periodo) {
     doc.text("Emitido em: " + hoje.toLocaleDateString("pt-BR"), pW / 2, y, { align: "center" }); y += 9;
 
     function rodapePagina() {
+      doc.setFont("helvetica", "italic"); doc.setFontSize(6.5); doc.setTextColor(120, 128, 138);
+      doc.text("Relatorio gerado por sistema desenvolvido por Emanuel Sales - Analista da PGM - PROFAZ", pW - mR, pH - 20, { align: "right" });
       doc.setTextColor(26, 31, 36);
       doc.setFont("helvetica", "bold"); doc.setFontSize(8);
       doc.text("PROCURADORIA GERAL DO MUNICIPIO DE FORTALEZA", mL, pH - 16);
