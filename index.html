@@ -449,14 +449,81 @@ function gerarCapaPTAC(casoId) {
   linhaIdent("CPF/CNPJ", c.Documento || "");
   y += 10;
 
-  doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+  function valOuTraco(v, moeda) {
+    if (!v) return "-";
+    return moeda ? fmt(v) : String(v);
+  }
+
+  var detalhamento = null;
+  try { detalhamento = c.DetalhamentoTributos ? JSON.parse(c.DetalhamentoTributos) : null; } catch (e) { detalhamento = null; }
+
+  if (detalhamento && Object.keys(detalhamento).length > 0) {
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(26, 31, 36);
+    doc.text("COMPOSICAO POR SITUACAO DE COBRANCA", mL, y); y += 6;
+
+    const colsCompW = [contentW * 0.30, contentW * 0.23, contentW * 0.25, contentW * 0.22];
+    const colsCompLbl = ["Discriminacao", "CDAs ajuizadas", "CDAs em fase administrativa", "Total geral"];
+    doc.setFillColor(50, 85, 101);
+    doc.rect(mL, y, contentW, 7, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(255, 255, 255);
+    let cx = mL;
+    colsCompLbl.forEach((lbl, i) => {
+      const linhas = doc.splitTextToSize(lbl, colsCompW[i] - 3);
+      doc.text(linhas, cx + colsCompW[i] / 2, y + (linhas.length > 1 ? 3 : 4.5), { align: "center" });
+      cx += colsCompW[i];
+    });
+    y += 7;
+
+    const tributos = Object.keys(detalhamento).sort();
+    let totCdasAj = 0, totCdasAdm = 0, totSaldoAj = 0, totSaldoAdm = 0;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
+    tributos.forEach((trib, i) => {
+      const d = detalhamento[trib];
+      const cdasAj = d.ajuizadas.cdas, cdasAdm = d.administrativas.cdas;
+      totCdasAj += cdasAj; totCdasAdm += cdasAdm;
+      totSaldoAj += d.ajuizadas.saldo; totSaldoAdm += d.administrativas.saldo;
+      doc.setTextColor(26, 31, 36);
+      if (i % 2 === 1) { doc.setFillColor(242, 242, 242); doc.rect(mL, y, contentW, 7, "F"); }
+      doc.setDrawColor(221, 225, 229); doc.setLineWidth(0.2);
+      doc.rect(mL, y, contentW, 7);
+      let cx2 = mL;
+      const vals = [trib, valOuTraco(cdasAj), valOuTraco(cdasAdm), valOuTraco(cdasAj + cdasAdm)];
+      vals.forEach((v, vi) => {
+        doc.text(v, cx2 + colsCompW[vi] / 2, y + 4.5, { align: "center" });
+        cx2 += colsCompW[vi];
+      });
+      y += 7;
+    });
+
+    // linha Total de CDAs
+    doc.setFillColor(242, 242, 242);
+    doc.rect(mL, y, contentW, 7, "F");
+    doc.setDrawColor(221, 225, 229); doc.rect(mL, y, contentW, 7);
+    doc.setFont("helvetica", "bold");
+    let cx3 = mL;
+    const valsTot = ["Total de CDAs", valOuTraco(totCdasAj), valOuTraco(totCdasAdm), valOuTraco(totCdasAj + totCdasAdm)];
+    valsTot.forEach((v, vi) => { doc.text(v, cx3 + colsCompW[vi] / 2, y + 4.5, { align: "center" }); cx3 += colsCompW[vi]; });
+    y += 7;
+
+    // linha Saldo devedor
+    doc.setFillColor(242, 242, 242);
+    doc.rect(mL, y, contentW, 7, "F");
+    doc.setDrawColor(221, 225, 229); doc.rect(mL, y, contentW, 7);
+    let cx4 = mL;
+    const valsSaldo = ["Saldo devedor", valOuTraco(totSaldoAj, true), valOuTraco(totSaldoAdm, true), valOuTraco(totSaldoAj + totSaldoAdm, true)];
+    valsSaldo.forEach((v, vi) => { doc.text(v, cx4 + colsCompW[vi] / 2, y + 4.5, { align: "center" }); cx4 += colsCompW[vi]; });
+    y += 7 + 12;
+    doc.setFont("helvetica", "normal");
+  }
+
+  doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(26, 31, 36);
   doc.text("RESUMO CONSOLIDADO", mL, y); y += 6;
 
   const saldo = saldoCasoPDF(c);
   const cards = [
-    { label: "Total de CDAs", valor: c.NumeroCDAs || 0, cor: [41, 171, 226] },
-    { label: "Execucoes fiscais em curso", valor: c.NumeroExecucoesFiscais || 0, cor: [52, 73, 94] },
-    { label: "Saldo devedor consolidado", valor: fmt(saldo), cor: [224, 80, 32] }
+    { label: "Total de CDAs", valor: valOuTraco(c.NumeroCDAs || 0), cor: [0, 160, 220] },
+    { label: "Execucoes fiscais em curso", valor: valOuTraco(c.NumeroExecucoesFiscais || 0), cor: [50, 85, 101] },
+    { label: "Saldo devedor consolidado", valor: saldo ? fmt(saldo) : "-", cor: [241, 90, 34] }
   ];
   y = desenharCardsResumo(doc, y, mL, contentW, cards) + 20;
 
@@ -1551,23 +1618,37 @@ function processarUploadCDAs(event, casoId) {
       // Linhas 1-4 sao titulo/data de geracao/cabecalho; dados a partir da linha 5 (indice 4)
       const dados = linhas.slice(4).filter(r => r[0] && String(r[0]).trim() !== "Total");
 
-      const cdaTemAtiva = {};
+      const cdaInfo = {};
       const processosAtivos = new Set();
       let saldoTotal = 0;
 
       dados.forEach(r => {
         const numCda = String(r[0]).trim();
+        const tipoReceita = String(r[1] || "").trim();
         const processo = String(r[3] || "").trim();
         const status = String(r[18] || "").trim();
-        if (!(numCda in cdaTemAtiva)) cdaTemAtiva[numCda] = false;
+        if (!cdaInfo[numCda]) cdaInfo[numCda] = { ativa: false, tributo: "", ajuizada: false, saldo: 0 };
         if (status === "Ativo") {
-          cdaTemAtiva[numCda] = true;
-          saldoTotal += Number(r[15]) || 0; // coluna P - Saldo Devedor (por exercicio, NAO usar a coluna Q que repete o total)
+          cdaInfo[numCda].ativa = true;
+          cdaInfo[numCda].tributo = tipoReceita.split(" - ")[0].trim() || "Outros";
+          cdaInfo[numCda].ajuizada = !!processo;
+          cdaInfo[numCda].saldo += Number(r[15]) || 0; // coluna P - Saldo Devedor (por exercicio, NAO usar a coluna Q que repete o total)
+          saldoTotal += Number(r[15]) || 0;
           if (processo) processosAtivos.add(processo);
         }
       });
 
-      const numeroCDAs = Object.values(cdaTemAtiva).filter(v => v).length;
+      const detalhamento = {};
+      Object.values(cdaInfo).filter(c => c.ativa).forEach(c => {
+        if (!detalhamento[c.tributo]) {
+          detalhamento[c.tributo] = { ajuizadas: { cdas: 0, saldo: 0 }, administrativas: { cdas: 0, saldo: 0 } };
+        }
+        const grupo = c.ajuizada ? "ajuizadas" : "administrativas";
+        detalhamento[c.tributo][grupo].cdas += 1;
+        detalhamento[c.tributo][grupo].saldo += c.saldo;
+      });
+
+      const numeroCDAs = Object.values(cdaInfo).filter(c => c.ativa).length;
       const numeroExecucoes = processosAtivos.size;
 
       const casoAtual = casos.find(x => String(x.ID) === String(casoId));
@@ -1576,7 +1657,7 @@ function processarUploadCDAs(event, casoId) {
       const corDiferenca = diferenca === 0 ? "var(--texto-sec)" : (diferenca > 0 ? "#c0392b" : "#076b5e");
       const sinalDiferenca = diferenca > 0 ? "+" : "";
 
-      importPendente = { casoId, saldoTotal, numeroCDAs, numeroExecucoes };
+      importPendente = { casoId, saldoTotal, numeroCDAs, numeroExecucoes, detalhamento };
       preview.innerHTML = `Detectado: <b>${numeroCDAs} CDAs ativas</b> · <b>${numeroExecucoes} execucoes</b><br>
         Saldo atual: <b>${fmt(saldoAtual)}</b> &rarr; Novo: <b>${fmt(saldoTotal)}</b>
         <span style="color:${corDiferenca}">(${sinalDiferenca}${fmt(diferenca)})</span>
@@ -1596,7 +1677,8 @@ async function confirmarImportacaoCDAs() {
     id: importPendente.casoId,
     saldo: importPendente.saldoTotal,
     numeroCDAs: importPendente.numeroCDAs,
-    numeroExecucoes: importPendente.numeroExecucoes
+    numeroExecucoes: importPendente.numeroExecucoes,
+    detalhamentoTributos: JSON.stringify(importPendente.detalhamento || {})
   });
   if (resp && resp.erro) {
     preview.innerHTML = `<span style="color:#c0392b">Erro ao salvar: ${resp.erro}</span>`;
