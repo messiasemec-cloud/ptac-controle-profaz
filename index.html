@@ -463,9 +463,9 @@ function gerarCapaPTAC(casoId) {
 
     const colsCompW = [contentW * 0.30, contentW * 0.23, contentW * 0.25, contentW * 0.22];
     const colsCompLbl = ["Discriminacao", "CDAs ajuizadas", "CDAs em fase administrativa", "Total geral"];
-    doc.setFillColor(50, 85, 101);
+    doc.setFillColor(242, 242, 242);
     doc.rect(mL, y, contentW, 7, "F");
-    doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(26, 31, 36);
     let cx = mL;
     colsCompLbl.forEach((lbl, i) => {
       const linhas = doc.splitTextToSize(lbl, colsCompW[i] - 3);
@@ -477,13 +477,12 @@ function gerarCapaPTAC(casoId) {
     const tributos = Object.keys(detalhamento).sort();
     let totCdasAj = 0, totCdasAdm = 0, totSaldoAj = 0, totSaldoAdm = 0;
     doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
-    tributos.forEach((trib, i) => {
+    tributos.forEach((trib) => {
       const d = detalhamento[trib];
       const cdasAj = d.ajuizadas.cdas, cdasAdm = d.administrativas.cdas;
       totCdasAj += cdasAj; totCdasAdm += cdasAdm;
       totSaldoAj += d.ajuizadas.saldo; totSaldoAdm += d.administrativas.saldo;
       doc.setTextColor(26, 31, 36);
-      if (i % 2 === 1) { doc.setFillColor(242, 242, 242); doc.rect(mL, y, contentW, 7, "F"); }
       doc.setDrawColor(221, 225, 229); doc.setLineWidth(0.2);
       doc.rect(mL, y, contentW, 7);
       let cx2 = mL;
@@ -495,9 +494,7 @@ function gerarCapaPTAC(casoId) {
       y += 7;
     });
 
-    // linha Total de CDAs
-    doc.setFillColor(242, 242, 242);
-    doc.rect(mL, y, contentW, 7, "F");
+    // linha Total de CDAs (sem fundo, so negrito - igual ao modelo original)
     doc.setDrawColor(221, 225, 229); doc.rect(mL, y, contentW, 7);
     doc.setFont("helvetica", "bold");
     let cx3 = mL;
@@ -505,9 +502,7 @@ function gerarCapaPTAC(casoId) {
     valsTot.forEach((v, vi) => { doc.text(v, cx3 + colsCompW[vi] / 2, y + 4.5, { align: "center" }); cx3 += colsCompW[vi]; });
     y += 7;
 
-    // linha Saldo devedor
-    doc.setFillColor(242, 242, 242);
-    doc.rect(mL, y, contentW, 7, "F");
+    // linha Saldo devedor (sem fundo, so negrito - igual ao modelo original)
     doc.setDrawColor(221, 225, 229); doc.rect(mL, y, contentW, 7);
     let cx4 = mL;
     const valsSaldo = ["Saldo devedor", valOuTraco(totSaldoAj, true), valOuTraco(totSaldoAdm, true), valOuTraco(totSaldoAj + totSaldoAdm, true)];
