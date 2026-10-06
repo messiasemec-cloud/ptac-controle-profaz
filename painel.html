@@ -83,7 +83,7 @@ body { font-family: 'Source Sans 3', sans-serif; background: #e4e8ec; color: var
 .menu-item small { display: block; font-size: 11.5px; color: var(--texto-sec); margin-top: 2px; }
 
 .aviso-versao { background: #fff4e5; border: 1px solid #f0c27a; color: #7a4a00; border-radius: var(--radius); padding: 10px 14px; font-size: 13px; margin-bottom: 1rem; }
-/* graficos do Painel geral: em telas largas ficam nos quadrados a direita dos cartoes (sem mover nada);
+/* graficos do Painel geral: em telas largas ficam ao lado dos cartoes, com o conjunto centralizado;
    em telas menores vao para baixo dos cartoes */
 .pg-grid { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "a" "b" "g1" "g2"; }
 .pg-a { grid-area: a; } .pg-b { grid-area: b; } .pg-g1 { grid-area: g1; } .pg-g2 { grid-area: g2; }
@@ -104,8 +104,11 @@ body { font-family: 'Source Sans 3', sans-serif; background: #e4e8ec; color: var
 @media (min-width: 720px) {
   .pg-grid { grid-template-columns: 1fr 1fr; column-gap: 16px; grid-template-areas: "a a" "b b" "g1 g2"; }
 }
-@media (min-width: 1440px) {
-  .pg-grid { grid-template-columns: 100% clamp(250px, calc(50vw - 468px), 330px); column-gap: 12px; grid-template-areas: "a g1" "b g2"; }
+@media (min-width: 1240px) {
+  /* o conjunto (cartoes + graficos) fica CENTRALIZADO na pagina: a grade e mais larga que a coluna
+     de 852px e e puxada para a esquerda pela metade da largura extra */
+  .pg-grid { --gap: 12px; --w: 300px; width: calc(100% + var(--gap) + var(--w)); margin-left: calc(-1 * (var(--gap) + var(--w)) / 2);
+    grid-template-columns: calc(100% - var(--gap) - var(--w)) var(--w); column-gap: var(--gap); grid-template-areas: "a g1" "b g2"; }
   .grafico-in { position: absolute; inset: 0; }
   .pizza svg { height: 100%; max-height: 130px; }
   .barras { flex: 1; min-height: 0; height: auto; aspect-ratio: auto; max-height: none; }
