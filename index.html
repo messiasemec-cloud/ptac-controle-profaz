@@ -86,6 +86,11 @@ select:focus { border-color: var(--verde); }
 .lista-acoes { display: flex; flex-direction: column; align-items: center; gap: 5px; }
 .btn-capa { background: none; border: none; cursor: pointer; padding: 3px; border-radius: 4px; color: var(--texto-sec); display: flex; align-items: center; justify-content: center; }
 .btn-capa:hover { background: rgba(0,0,0,.07); color: var(--verde-escuro); }
+.parecer-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid var(--cinza-borda); border-radius: var(--radius); margin-bottom: 6px; font-size: 13px; color: var(--texto); }
+.parecer-meta { color: var(--texto-sec); font-size: 12px; margin-top: 2px; }
+.parecer-btn { background: none; border: 1px solid var(--cinza-borda); border-radius: 6px; padding: 4px 10px; font-size: 12.5px; cursor: pointer; color: var(--texto); font-family: inherit; }
+.parecer-btn:hover { background: rgba(0,0,0,.05); }
+.parecer-btn.perigo:hover { color: #c0392b; border-color: #c0392b; }
 .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--verde); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
 .lista-nome { font-size: 13px; font-weight: 600; color: var(--texto); }
 .lista-sub { font-size: 12px; color: var(--texto-sec); margin-top: 2px; }
@@ -1491,8 +1496,162 @@ async function renderFicha() {
         </div>
         <div id="preview-upload-cdas" style="margin-top:8px;font-size:13px;color:var(--texto-sec)"></div>
       </div>
+      <div class="field">
+        <label>Pareceres</label>
+        <div id="lista-pareceres-${c.ID}" style="font-size:13px;color:var(--texto-sec)">Carregando...</div>
+        <div style="margin-top:10px;padding:12px;border:1px dashed var(--cinza-borda);border-radius:8px">
+          <div class="field">
+            <label>Arquivo do parecer (PDF, até 10 MB)</label>
+            <input type="file" id="parecer-arquivo-${c.ID}" accept="application/pdf,.pdf">
+          </div>
+          <div class="field">
+            <label>Título (opcional)</label>
+            <input type="text" id="parecer-titulo-${c.ID}" placeholder="Ex.: Parecer sobre o cancelamento das CDAs">
+          </div>
+          <div class="field">
+            <label>Seu nome</label>
+            <input type="text" id="parecer-autor-${c.ID}" placeholder="Procurador(a) autor(a) do parecer">
+          </div>
+          <button class="btn-submit" style="width:auto;padding:8px 16px" id="parecer-enviar-${c.ID}" onclick="anexarParecer('${c.ID}')">Anexar parecer</button>
+          <div id="parecer-msg-${c.ID}" style="margin-top:8px;font-size:13px;color:var(--texto-sec)"></div>
+        </div>
+      </div>
       ${c.Eixo === "Inventario" ? blocoInventarioFicha(c) : ""}
     </div>`;
+  carregarPareceresFicha(c.ID);
+}
+
+// ---------- Pareceres anexados (PDF) ----------
+const LIMITE_PARECER = 10 * 1024 * 1024;
+
+function escHtml(t) {
+  return String(t === undefined || t === null ? "" : t)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function formatarTamanhoArquivo(bytes) {
+  const b = Number(bytes) || 0;
+  if (b >= 1024 * 1024) return (b / (1024 * 1024)).toFixed(1).replace(".", ",") + " MB";
+  return Math.max(1, Math.round(b / 1024)) + " KB";
+}
+
+function lerArquivoBase64(file) {
+  return new Promise((resolve, reject) => {
+    const leitor = new FileReader();
+    leitor.onload = () => resolve(String(leitor.result).split(",")[1] || "");
+    leitor.onerror = () => reject(new Error("Não foi possível ler o arquivo"));
+    leitor.readAsDataURL(file);
+  });
+}
+
+async function apiPost(acao, payload) {
+  // text/plain evita o pre-flight de CORS, que o Apps Script nao responde
+  const resp = await fetch(APPS_SCRIPT_URL + "?acao=" + encodeURIComponent(acao), { method: "POST", body: JSON.stringify(payload) });
+  return JSON.parse(await resp.text());
+}
+
+function baixarArquivoBase64(base64, nome, mime) {
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const url = URL.createObjectURL(new Blob([bytes], { type: mime || "application/pdf" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = nome || "parecer.pdf";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+async function carregarPareceresFicha(casoId) {
+  const alvoInicial = document.getElementById("lista-pareceres-" + casoId);
+  if (!alvoInicial) return;
+  try {
+    const autorSalvo = (() => { try { return localStorage.getItem("ptac_autor_parecer") || ""; } catch (e) { return ""; } })();
+    const campoAutor = document.getElementById("parecer-autor-" + casoId);
+    if (campoAutor && !campoAutor.value) campoAutor.value = autorSalvo;
+  } catch (e) { /* so conveniencia */ }
+  let lista;
+  try {
+    lista = await api("listarPareceres", { casoId: casoId });
+  } catch (e) {
+    const alvo = document.getElementById("lista-pareceres-" + casoId);
+    if (alvo) alvo.textContent = "Não foi possível carregar os pareceres agora.";
+    return;
+  }
+  const alvo = document.getElementById("lista-pareceres-" + casoId);
+  if (!alvo) return;
+  if (!Array.isArray(lista)) { alvo.textContent = "Não foi possível carregar os pareceres" + (lista && lista.erro ? ": " + lista.erro : "."); return; }
+  if (!lista.length) { alvo.textContent = "Nenhum parecer anexado ainda."; return; }
+  lista.sort((a, b) => Number(b.id) - Number(a.id));
+  alvo.innerHTML = lista.map(p => {
+    const data = isNaN(new Date(p.data)) ? "" : new Date(p.data).toLocaleDateString("pt-BR");
+    const titulo = p.titulo || p.nomeArquivo;
+    return `<div class="parecer-item">
+      <div style="min-width:0">
+        <div style="font-weight:600;overflow-wrap:anywhere">${escHtml(titulo)}</div>
+        <div class="parecer-meta">${escHtml(p.autor)}${data ? " · " + data : ""} · ${formatarTamanhoArquivo(p.tamanho)}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="parecer-btn" onclick="baixarParecerFicha('${p.id}', this)">Baixar</button>
+        <button class="parecer-btn perigo" onclick="removerParecerFicha('${p.id}', '${casoId}')">Remover</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function baixarParecerFicha(id, botao) {
+  const textoOriginal = botao.textContent;
+  botao.disabled = true; botao.textContent = "Baixando...";
+  try {
+    const r = await api("baixarParecer", { id: id });
+    if (!r || r.erro) throw new Error(r && r.erro ? r.erro : "falha");
+    baixarArquivoBase64(r.base64, r.nome, r.mime);
+  } catch (e) {
+    alert("Não foi possível baixar o parecer: " + e.message);
+  } finally {
+    botao.disabled = false; botao.textContent = textoOriginal;
+  }
+}
+
+async function removerParecerFicha(id, casoId) {
+  if (!confirm("Remover este parecer? O arquivo vai para a lixeira do Drive e sai da lista.")) return;
+  try {
+    const r = await api("removerParecer", { id: id });
+    if (r && r.erro) throw new Error(r.erro);
+  } catch (e) {
+    alert("Não foi possível remover: " + e.message);
+  }
+  await carregarPareceresFicha(casoId);
+}
+
+async function anexarParecer(casoId) {
+  const msg = document.getElementById("parecer-msg-" + casoId);
+  const entrada = document.getElementById("parecer-arquivo-" + casoId);
+  const botao = document.getElementById("parecer-enviar-" + casoId);
+  const mostrarErro = (t) => { msg.innerHTML = `<span style="color:#c0392b">${escHtml(t)}</span>`; };
+  const arquivo = entrada && entrada.files && entrada.files[0];
+  if (!arquivo) return mostrarErro("Escolha o arquivo PDF do parecer.");
+  if (!/\.pdf$/i.test(arquivo.name) && arquivo.type !== "application/pdf") return mostrarErro("O arquivo precisa ser um PDF.");
+  if (arquivo.size > LIMITE_PARECER) return mostrarErro("O arquivo tem " + formatarTamanhoArquivo(arquivo.size) + ". O limite é 10 MB.");
+  const autor = document.getElementById("parecer-autor-" + casoId).value.trim();
+  if (!autor) return mostrarErro("Informe o seu nome (autor do parecer).");
+  try { localStorage.setItem("ptac_autor_parecer", autor); } catch (e) { /* so conveniencia */ }
+  const titulo = document.getElementById("parecer-titulo-" + casoId).value.trim();
+
+  botao.disabled = true;
+  msg.textContent = "Enviando...";
+  try {
+    const base64 = await lerArquivoBase64(arquivo);
+    const r = await apiPost("anexarParecer", { casoId: casoId, titulo: titulo, autor: autor, nomeArquivo: arquivo.name, base64: base64 });
+    if (r && r.erro) { mostrarErro(r.erro); return; }
+    msg.innerHTML = `<span style="color:#076b5e">Parecer anexado.</span>`;
+    entrada.value = "";
+    document.getElementById("parecer-titulo-" + casoId).value = "";
+  } catch (e) {
+    mostrarErro("Não foi possível confirmar o envio. Confira a lista acima antes de tentar de novo, para não duplicar.");
+  } finally {
+    botao.disabled = false;
+    await carregarPareceresFicha(casoId);
+  }
 }
 
 function melhorCombinacao(itensBens, patrimonio) {
