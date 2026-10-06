@@ -14,7 +14,7 @@
   --texto: #1a1f24; --texto-sec: #5a6472; --branco: #ffffff;
   --radius: 8px; --radius-lg: 12px;
 }
-body { font-family: 'Source Sans 3', sans-serif; background: var(--cinza-bg); color: var(--texto); min-height: 100vh; padding: 0 0 3rem; }
+body { font-family: 'Source Sans 3', sans-serif; background: #e4e8ec; color: var(--texto); min-height: 100vh; padding: 0 0 3rem; }
 
 .header { background: var(--branco); border-bottom: 3px solid var(--verde); }
 .header-top { display: flex; align-items: center; padding: 1rem 2rem; gap: 1.5rem; }
@@ -50,7 +50,6 @@ body { font-family: 'Source Sans 3', sans-serif; background: var(--cinza-bg); co
 .chip { background: var(--branco); border: 1.5px solid var(--cinza-borda); border-radius: 20px; padding: 6px 14px; font-family: inherit; font-size: 13px; font-weight: 600; color: var(--texto); cursor: pointer; }
 .chip:hover { border-color: var(--verde); }
 .chip.ativo { background: var(--verde); border-color: var(--verde); color: #fff; }
-.chip .n { font-weight: 500; opacity: .75; margin-left: 4px; }
 
 .busca { width: 100%; padding: 12px 14px; border: 1.5px solid var(--cinza-borda); border-radius: var(--radius); font-size: 14px; font-family: inherit; background: var(--branco); }
 .busca:focus { outline: none; border-color: var(--verde); }
@@ -117,7 +116,7 @@ body { font-family: 'Source Sans 3', sans-serif; background: var(--cinza-bg); co
 
 <div class="abas-wrap"><nav class="abas">
   <button class="aba" id="aba-painel" data-aba="painel">Painel geral</button>
-  <button class="aba" id="aba-andamento" data-aba="andamento">Andamento</button>
+  <button class="aba" id="aba-contribuintes" data-aba="contribuintes">Contribuintes</button>
 </nav></div>
 
 <div class="container" id="app"><div class="estado">Carregando…</div></div>
@@ -223,7 +222,8 @@ async function carregar() {
   }
 }
 
-function abaAtual() { return location.hash === "#andamento" ? "andamento" : "painel"; }
+// "#andamento" era o nome antigo da aba: continua abrindo a lista, para links ja compartilhados
+function abaAtual() { return (location.hash === "#contribuintes" || location.hash === "#andamento") ? "contribuintes" : "painel"; }
 
 function render() {
   fecharMenu();
@@ -234,7 +234,7 @@ function render() {
     if (ativa) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
   });
   if (!carregado) return;
-  if (aba === "andamento") renderAndamento(); else renderPainelGeral();
+  if (aba === "contribuintes") renderContribuintes(); else renderPainelGeral();
   window.scrollTo(0, 0);
 }
 
@@ -267,7 +267,7 @@ function painelGeralHtml(r) {
       card("Execuções fiscais extintas", n(r.efConcluido), "verde"))}`;
 }
 
-/* ---------------- Andamento (lista por mes, somente leitura) ---------------- */
+/* ---------------- Contribuintes (lista por mes, somente leitura) ---------------- */
 function agruparPorMes(lista) {
   const grupos = {};
   lista.forEach(d => { (grupos[chaveMes(d)] = grupos[chaveMes(d)] || []).push(d); });
@@ -279,16 +279,16 @@ function ordemMeses(grupos) {
   return chaves;
 }
 
-function renderAndamento() {
+function renderContribuintes() {
   const app = document.getElementById("app");
   if (!devedores.length) { app.innerHTML = (servidorDesatualizado ? AVISO_VERSAO : "") + `<div class="card estado">Nenhum PTAC cadastrado ainda.</div>`; return; }
   const grupos = agruparPorMes(devedores);
   const chaves = ordemMeses(grupos);
   if (mesSel !== "todos" && !grupos[mesSel]) mesSel = "todos";
 
-  const chip = (chave, rotulo, n) => `<button class="chip${mesSel === chave ? " ativo" : ""}" data-mes="${esc(chave)}" aria-pressed="${mesSel === chave}">${esc(rotulo)}<span class="n">${n}</span></button>`;
+  const chip = (chave, rotulo) => `<button class="chip${mesSel === chave ? " ativo" : ""}" data-mes="${esc(chave)}" aria-pressed="${mesSel === chave}">${esc(rotulo)}</button>`;
   app.innerHTML = (servidorDesatualizado ? AVISO_VERSAO : "") + `
-    <div class="chips" id="chips">${chip("todos", "Todos", devedores.length)}${chaves.map(k => chip(k, rotuloChip(k), grupos[k].length)).join("")}</div>
+    <div class="chips" id="chips">${chip("todos", "Todos")}${chaves.map(k => chip(k, rotuloChip(k))).join("")}</div>
     <input class="busca" id="busca" type="search" placeholder="Buscar devedor por nome ou CPF/CNPJ" value="${esc(busca)}" autocomplete="off">
     <div class="dica">O ícone <b>⬇</b> aparece nos devedores com parecer anexado: clique para baixar.</div>
     <div id="lista-meses"></div>`;
@@ -297,7 +297,7 @@ function renderAndamento() {
     const b = ev.target.closest(".chip");
     if (!b) return;
     mesSel = b.dataset.mes;
-    renderAndamento();
+    renderContribuintes();
   });
   const campo = document.getElementById("busca");
   campo.addEventListener("input", () => { busca = campo.value; renderListaMeses(); });
@@ -406,7 +406,7 @@ async function baixar(id, botao) {
 }
 
 document.querySelectorAll(".aba").forEach(b => b.addEventListener("click", () => {
-  const alvo = b.dataset.aba === "andamento" ? "#andamento" : "";
+  const alvo = b.dataset.aba === "contribuintes" ? "#contribuintes" : "";
   if (location.hash === alvo) render(); // ja estava nessa aba: so redesenha
   else location.hash = alvo;            // o evento hashchange redesenha
 }));

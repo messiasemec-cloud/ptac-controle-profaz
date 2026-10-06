@@ -44,6 +44,16 @@ body { font-family: 'Source Sans 3', sans-serif; background: var(--cinza-bg); co
 .form-title { font-size: 18px; font-weight: 600; color: var(--verde-escuro); margin-bottom: 4px; }
 .form-sub { font-size: 13px; color: var(--texto-sec); margin-bottom: 1.5rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--cinza-borda); }
 .field { margin-bottom: 1.4rem; }
+/* blocos da ficha do devedor: um tom sutil para cada area (hipotese, importar planilha, pareceres) */
+.bloco { padding: 14px 16px; border-radius: var(--radius); border: 1px solid; }
+.bloco > label { margin-bottom: 6px; }
+.bloco-hipotese { background: #f2f7fc; border-color: #d3e3f2; }
+.bloco-hipotese > label { color: #3f6b93; }
+.bloco-importar { background: #fdf6ed; border-color: #f0dcc2; }
+.bloco-importar > label { color: #9a6420; }
+.bloco-pareceres { background: #f5f1fa; border-color: #ddd2ea; }
+.bloco-pareceres > label { color: #6b4a93; }
+.bloco .parecer-item { background: var(--branco); }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.4rem; }
 label { display: block; font-size: 12px; font-weight: 600; color: var(--texto-sec); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .04em; }
 input[type="text"], input[type="number"] { width: 100%; padding: 10px 14px; border: 1.5px solid var(--cinza-borda); border-radius: var(--radius); font-size: 15px; font-family: 'Source Sans 3', sans-serif; color: var(--texto); background: var(--branco); outline: none; transition: border-color .15s; }
@@ -1451,7 +1461,7 @@ async function renderFicha() {
           ${listaStatus.map(s => `<option ${s===c.Status?"selected":""}>${s}</option>`).join("")}
         </select>
       </div>
-      <div class="field">
+      <div class="field bloco bloco-hipotese">
         <label>Hipotese de incidencia</label>
         <div style="font-size:13.5px;color:var(--texto);margin-bottom:6px">
           ${hipoteseInfo(c.HipoteseIncidencia)
@@ -1461,13 +1471,13 @@ async function renderFicha() {
         <a href="#" style="font-size:12.5px;color:var(--verde);text-decoration:underline" onclick="abrirModalHipotese('${c.ID}'); return false;">${c.HipoteseIncidencia ? "Alterar hipotese" : "Selecionar hipotese"}</a>
       </div>
       ${podeEncaminharPtac ? `<button class="btn-buscar" style="background:var(--laranja);margin-bottom:1rem" onclick="confirmarEncaminharPtac('${c.ID}','${c.Devedor.replace(/'/g,"\\'")}')">Encaminhar ao PTAC</button>` : ""}
-      <div class="field">
+      <div class="field bloco bloco-importar">
         <label>Importar planilha de CDAs do Agilis (atualiza saldo, CDAs e execucoes deste devedor)</label>
         <input type="file" id="upload-cdas-${c.ID}" accept=".xlsx" onchange="processarUploadCDAs(event, '${c.ID}')">
         <div style="margin-top:6px">
           <a href="#" style="font-size:12.5px;color:var(--texto-sec);text-decoration:underline" onclick="toggleManualAgregado('${c.ID}'); return false;">Planilha grande demais para ser baixada</a>
         </div>
-        <div id="manual-agregado-${c.ID}" style="display:none;margin-top:10px;padding:12px;border:1px dashed var(--cinza-borda);border-radius:8px">
+        <div id="manual-agregado-${c.ID}" style="display:none;margin-top:10px;padding:12px;border:1px dashed var(--cinza-borda);border-radius:8px;background:rgba(255,255,255,.7)">
           <div style="font-size:12px;color:var(--texto-sec);margin-bottom:8px">Saldo devedor atual: <b>${fmt(saldoCaso(c))}</b></div>
           <div class="field">
             <label>Saldo devedor (R$)</label>
@@ -1485,10 +1495,10 @@ async function renderFicha() {
         </div>
         <div id="preview-upload-cdas" style="margin-top:8px;font-size:13px;color:var(--texto-sec)"></div>
       </div>
-      <div class="field">
+      <div class="field bloco bloco-pareceres">
         <label>Pareceres</label>
         <div id="lista-pareceres-${c.ID}" style="font-size:13px;color:var(--texto-sec)">Carregando...</div>
-        <div style="margin-top:10px;padding:12px;border:1px dashed var(--cinza-borda);border-radius:8px">
+        <div style="margin-top:10px;padding:12px;border:1px dashed var(--cinza-borda);border-radius:8px;background:rgba(255,255,255,.7)">
           <div class="field">
             <label>Arquivo do parecer (PDF, até 10 MB)</label>
             <input type="file" id="parecer-arquivo-${c.ID}" accept="application/pdf,.pdf">
