@@ -1549,15 +1549,49 @@ async function apiPost(acao, payload) {
   return JSON.parse(await resp.text());
 }
 
-function baixarArquivoBase64(base64, nome, mime) {
-  const bin = atob(base64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+function baixarArquivoBytes(bytes, nome, mime) {
   const url = URL.createObjectURL(new Blob([bytes], { type: mime || "application/pdf" }));
   const a = document.createElement("a");
   a.href = url; a.download = nome || "parecer.pdf";
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+// Baixa o PDF em PARTES (cada resposta com menos de ~1 MB) e junta no navegador.
+// Funciona tambem com o Code.gs antigo (que devolve o arquivo inteiro de uma vez).
+async function obterParecer(id, aoProgredir) {
+  const primeira = await api("baixarParecer", { id: id, parte: 0 });
+  if (!primeira || primeira.erro || !primeira.base64) throw new Error(primeira && primeira.erro ? primeira.erro : "falha ao obter o arquivo");
+  const total = Math.max(1, Number(primeira.partes) || 1);
+  const pedacos = new Array(total);
+  pedacos[0] = primeira.base64;
+  let concluidas = 1, proxima = 1, falhou = false;
+  if (aoProgredir) aoProgredir(concluidas, total);
+  async function trabalhador() {
+    while (!falhou && proxima < total) {
+      const i = proxima++;
+      try {
+        const r = await api("baixarParecer", { id: id, parte: i });
+        if (!r || r.erro || !r.base64 || Number(r.parte) !== i) throw new Error(r && r.erro ? r.erro : "a parte " + (i + 1) + " veio incompleta");
+        pedacos[i] = r.base64;
+        concluidas++;
+        if (aoProgredir) aoProgredir(concluidas, total);
+      } catch (e) { falhou = true; throw e; }
+    }
+  }
+  await Promise.all([trabalhador(), trabalhador(), trabalhador()]);
+  const partes = pedacos.map(b64 => {
+    const bin = atob(b64);
+    const u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return u8;
+  });
+  const tamanhoFinal = partes.reduce((s, p) => s + p.length, 0);
+  if (primeira.tamanho !== undefined && Number(primeira.tamanho) !== tamanhoFinal) throw new Error("download incompleto");
+  const bytes = new Uint8Array(tamanhoFinal);
+  let pos = 0;
+  partes.forEach(p => { bytes.set(p, pos); pos += p.length; });
+  return { nome: primeira.nome, mime: primeira.mime, bytes: bytes };
 }
 
 async function carregarPareceresFicha(casoId) {
@@ -1601,9 +1635,8 @@ async function baixarParecerFicha(id, botao) {
   const textoOriginal = botao.textContent;
   botao.disabled = true; botao.textContent = "Baixando...";
   try {
-    const r = await api("baixarParecer", { id: id });
-    if (!r || r.erro) throw new Error(r && r.erro ? r.erro : "falha");
-    baixarArquivoBase64(r.base64, r.nome, r.mime);
+    const r = await obterParecer(id, (feitas, total) => { if (total > 1) botao.textContent = "Baixando " + feitas + "/" + total + "…"; });
+    baixarArquivoBytes(r.bytes, r.nome, r.mime);
   } catch (e) {
     alert("Não foi possível baixar o parecer: " + e.message);
   } finally {

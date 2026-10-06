@@ -83,6 +83,33 @@ body { font-family: 'Source Sans 3', sans-serif; background: #e4e8ec; color: var
 .menu-item small { display: block; font-size: 11.5px; color: var(--texto-sec); margin-top: 2px; }
 
 .aviso-versao { background: #fff4e5; border: 1px solid #f0c27a; color: #7a4a00; border-radius: var(--radius); padding: 10px 14px; font-size: 13px; margin-bottom: 1rem; }
+/* graficos do Painel geral: em telas largas ficam nos quadrados a direita dos cartoes (sem mover nada);
+   em telas menores vao para baixo dos cartoes */
+.pg-grid { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "a" "b" "g1" "g2"; }
+.pg-a { grid-area: a; } .pg-b { grid-area: b; } .pg-g1 { grid-area: g1; } .pg-g2 { grid-area: g2; }
+.grafico { background: var(--branco); border: 1px solid var(--cinza-borda); border-radius: var(--radius-lg); margin-bottom: 1rem; position: relative; overflow: hidden; }
+.grafico-in { padding: 14px 16px; display: flex; flex-direction: column; }
+.grafico h3 { font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--texto); }
+.pizza { display: flex; align-items: center; gap: 12px; flex: 1; min-height: 0; }
+.pizza svg { flex: none; height: 130px; width: auto; max-width: 46%; }
+.legenda { list-style: none; flex: 1; min-width: 0; font-size: 11.5px; }
+.legenda li { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.legenda i { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+.legenda .rot { flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.2; }
+.legenda b { font-weight: 700; }
+.barras { width: 100%; height: auto; aspect-ratio: 260 / 175; max-height: 260px; flex: none; }
+.barras text { font-family: inherit; }
+.grafico .nota { font-size: 10.5px; color: var(--texto-sec); margin-top: 4px; }
+.grafico .vazio { color: var(--texto-sec); font-size: 12.5px; padding: 1.5rem 0; text-align: center; }
+@media (min-width: 720px) {
+  .pg-grid { grid-template-columns: 1fr 1fr; column-gap: 16px; grid-template-areas: "a a" "b b" "g1 g2"; }
+}
+@media (min-width: 1440px) {
+  .pg-grid { grid-template-columns: 100% clamp(250px, calc(50vw - 468px), 330px); column-gap: 12px; grid-template-areas: "a g1" "b g2"; }
+  .grafico-in { position: absolute; inset: 0; }
+  .pizza svg { height: 100%; max-height: 130px; }
+  .barras { flex: 1; min-height: 0; height: auto; aspect-ratio: auto; max-height: none; }
+}
 .estado { text-align: center; color: var(--texto-sec); font-size: 14px; padding: 2.5rem 1rem; }
 .btn-secundario { margin-top: 12px; background: var(--branco); border: 1.5px solid var(--cinza-borda); border-radius: var(--radius); padding: 8px 14px; font-family: inherit; font-size: 13.5px; cursor: pointer; }
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #1a1f24; color: #fff; padding: 10px 16px; border-radius: var(--radius); font-size: 13.5px; z-index: 50; max-width: 90vw; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
@@ -240,31 +267,131 @@ function render() {
 
 const AVISO_VERSAO = `<div class="aviso-versao"><b>Atenção:</b> os dados desta página estão incompletos porque o servidor (Code.gs) ainda não foi atualizado para a versão nova. Avise o administrador do sistema.</div>`;
 
+/* ---------------- Graficos (SVG, sem biblioteca) ---------------- */
+const GRUPOS_FASE = [
+  { rot: "Instaurado", cor: "#d64545", st: ["Instaurado"] },
+  { rot: "Ofício expedido à SEFIN", cor: "#e8892b", st: ["Oficio expedido a SEFIN"] },
+  { rot: "Elaboração de parecer", cor: "#e3b505", st: ["Elaboracao de parecer"] },
+  { rot: "Aprovação pela chefia", cor: "#6aa84f", st: ["Aprovacao pela chefia"] },
+  { rot: "Concluído", cor: "#0a8a7a", st: ["Concluido", "Concluido/Extinto"] }
+];
+const COR_OUTROS = "#9aa3ad";
+
+function dadosPizza(lista) {
+  const fatias = GRUPOS_FASE.map(g => ({ rot: g.rot, cor: g.cor, n: lista.filter(d => g.st.includes(d.status)).length }));
+  const resto = lista.length - fatias.reduce((s, f) => s + f.n, 0);
+  fatias.push({ rot: "Identificado / outros", cor: COR_OUTROS, n: resto });
+  return fatias.filter(f => f.n > 0);
+}
+
+function caminhoFatia(cx, cy, r, a0, a1) { // angulos em radianos; 0 = topo, sentido horario
+  const x0 = cx + r * Math.sin(a0), y0 = cy - r * Math.cos(a0), x1 = cx + r * Math.sin(a1), y1 = cy - r * Math.cos(a1);
+  return `M${cx},${cy} L${x0.toFixed(2)},${y0.toFixed(2)} A${r},${r} 0 ${(a1 - a0) > Math.PI ? 1 : 0} 1 ${x1.toFixed(2)},${y1.toFixed(2)} Z`;
+}
+
+function graficoPizzaHtml(lista) {
+  const fatias = dadosPizza(lista), total = lista.length;
+  const titulo = `<h3>PTACs por fase</h3>`;
+  if (!total) return `${titulo}<div class="vazio">Sem dados.</div>`;
+  let angulo = 0;
+  const partes = fatias.map(f => {
+    const a1 = angulo + (f.n / total) * 2 * Math.PI;
+    const dica = `${f.rot}: ${plural(f.n, "PTAC", "PTACs")} (${Math.round(f.n / total * 100)}%)`;
+    const forma = fatias.length === 1
+      ? `<circle cx="50" cy="50" r="48" fill="${f.cor}"><title>${esc(dica)}</title></circle>`
+      : `<path d="${caminhoFatia(50, 50, 48, angulo, a1)}" fill="${f.cor}" stroke="#fff" stroke-width="1.2"><title>${esc(dica)}</title></path>`;
+    angulo = a1;
+    return forma;
+  }).join("");
+  const legenda = fatias.map(f => `<li><i style="background:${f.cor}"></i><span class="rot">${esc(f.rot)}</span><b>${f.n}</b></li>`).join("");
+  return `${titulo}<div class="pizza">
+    <svg viewBox="0 0 100 100" role="img" aria-label="Gráfico de pizza: PTACs por fase">${partes}</svg>
+    <ul class="legenda">${legenda}</ul></div>`;
+}
+
+function dadosBarras(lista) {
+  const cont = {}; let semData = 0;
+  lista.forEach(d => { const k = chaveMes(d); if (k === "sem-data") semData++; else cont[k] = (cont[k] || 0) + 1; });
+  const chaves = Object.keys(cont).sort();
+  if (!chaves.length) return { meses: [], semData };
+  const [a0, m0] = chaves[0].split("-").map(Number), [a1, m1] = chaves[chaves.length - 1].split("-").map(Number);
+  const vao = (a1 - a0) * 12 + (m1 - m0) + 1;
+  let meses;
+  if (vao <= 24) { // preenche com zero os meses sem PTAC entre o primeiro e o ultimo
+    meses = [];
+    for (let a = a0, m = m0; a < a1 || (a === a1 && m <= m1); ) {
+      const k = a + "-" + String(m).padStart(2, "0");
+      meses.push({ chave: k, n: cont[k] || 0 });
+      if (++m > 12) { m = 1; a++; }
+    }
+  } else { // datas muito espalhadas (provavel erro de digitacao): so os meses com dado, ultimos 24
+    meses = chaves.slice(-24).map(k => ({ chave: k, n: cont[k] }));
+  }
+  return { meses, semData };
+}
+
+function graficoBarrasHtml(lista) {
+  const { meses, semData } = dadosBarras(lista);
+  const titulo = `<h3>PTACs instaurados por mês</h3>`;
+  const nota = semData ? `<div class="nota">${plural(semData, "PTAC sem data de instauração não aparece", "PTACs sem data de instauração não aparecem")} no gráfico.</div>` : "";
+  if (!meses.length) return `${titulo}<div class="vazio">Sem datas de instauração.</div>${nota}`;
+  const W = 260, H = 175, base = 143, topo = 22, folga = 8;
+  const slot = (W - 2 * folga) / meses.length, larg = Math.min(slot * 0.62, 34);
+  const maximo = Math.max(...meses.map(m => m.n), 1);
+  const passo = meses.length > 12 ? 2 : 1;
+  const barras = meses.map((m, i) => {
+    const cx = folga + slot * i + slot / 2, h = (m.n / maximo) * (base - topo);
+    const [ano, mes] = m.chave.split("-").map(Number);
+    const dica = `${MESES[mes - 1]} de ${ano}: ${plural(m.n, "PTAC instaurado", "PTACs instaurados")}`;
+    const rotulo = i % passo === 0
+      ? `<text x="${cx.toFixed(1)}" y="157" font-size="9.5" text-anchor="middle" fill="#1a1f24">${MESES_ABREV[mes - 1]}</text>`
+        + ((i === 0 || mes === 1) ? `<text x="${cx.toFixed(1)}" y="168" font-size="8.5" text-anchor="middle" fill="#5a6472">${ano}</text>` : "")
+      : "";
+    const valor = m.n
+      ? `<rect x="${(cx - larg / 2).toFixed(1)}" y="${(base - h).toFixed(1)}" width="${larg.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="#185FA5"></rect>`
+        + `<text x="${cx.toFixed(1)}" y="${(base - h - 4).toFixed(1)}" font-size="10" font-weight="700" text-anchor="middle" fill="#1a1f24">${m.n}</text>`
+      : `<text x="${cx.toFixed(1)}" y="${base - 4}" font-size="9" text-anchor="middle" fill="#9aa3ad">0</text>`;
+    return `<g><title>${esc(dica)}</title>${valor}${rotulo}</g>`;
+  }).join("");
+  return `${titulo}<svg class="barras" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Gráfico de barras: PTACs instaurados por mês">`
+    + `<line x1="${folga}" y1="${base}" x2="${W - folga}" y2="${base}" stroke="#dde1e5" stroke-width="1"></line>${barras}</svg>${nota}`;
+}
+
 /* ---------------- Painel geral ---------------- */
 function renderPainelGeral() {
   document.getElementById("app").innerHTML = (servidorDesatualizado ? AVISO_VERSAO : "")
-    + (resumo ? painelGeralHtml(resumo) : `<div class="card estado">Os números do painel não estão disponíveis no momento.</div>`);
+    + (resumo ? painelGeralHtml(resumo, servidorDesatualizado ? [] : devedores) : `<div class="card estado">Os números do painel não estão disponíveis no momento.</div>`);
 }
 
-function painelGeralHtml(r) {
+function painelGeralHtml(r, lista) {
   const n = v => Number(v || 0).toLocaleString("pt-BR");
   const instaurados = (r.casosEmCurso || 0) + (r.casosConcluidos || 0);
   const card = (rotulo, valor, cor) => `<div class="scorecard"><div class="scorecard-label">${rotulo}</div><div class="scorecard-valor ${cor}">${valor}</div></div>`;
   const painel = (titulo, a, b, c) => `<div class="painel-card"><div class="painel-titulo">${titulo}</div><div class="scorecards">${a}${b}${c}</div></div>`;
-  return `
-    <div class="scorecards um"><div class="scorecard"><div class="scorecard-label">Total</div><div class="scorecard-valor azul">${n(r.totalCasos)}</div><div class="scorecard-sub">casos cadastrados</div></div></div>
-    ${painel("Instaurado — fluxo PTAC",
-      card("Processos instaurados", n(instaurados), "azul"),
-      card("Valor total instaurado", fmt((r.saldoEmCurso || 0) + (r.saldoConcluido || 0)), "azul"),
-      card("Execuções fiscais", n((r.efEmCurso || 0) + (r.efConcluido || 0)), "azul"))}
-    ${painel("Em curso — fluxo PTAC",
-      card("Processos em curso", n(r.casosEmCurso), "laranja"),
-      card("Valor em curso", fmt(r.saldoEmCurso), "laranja"),
-      card("Execuções fiscais em curso", n(r.efEmCurso), "laranja"))}
-    ${painel("Concluído — fluxo PTAC",
-      card("Processos concluídos", n(r.casosConcluidos), "verde"),
-      card("Tratamento adequado (valor)", fmt(r.saldoConcluido), "verde"),
-      card("Execuções fiscais extintas", n(r.efConcluido), "verde"))}`;
+  const graficos = lista && lista.length
+    ? `<div class="grafico pg-g1"><div class="grafico-in">${graficoPizzaHtml(lista)}</div></div>
+       <div class="grafico pg-g2"><div class="grafico-in">${graficoBarrasHtml(lista)}</div></div>`
+    : "";
+  return `<div class="pg-grid">
+    <div class="pg-a">
+      <div class="scorecards um"><div class="scorecard"><div class="scorecard-label">Total</div><div class="scorecard-valor azul">${n(r.totalCasos)}</div><div class="scorecard-sub">casos cadastrados</div></div></div>
+      ${painel("Instaurado — fluxo PTAC",
+        card("Processos instaurados", n(instaurados), "azul"),
+        card("Valor total instaurado", fmt((r.saldoEmCurso || 0) + (r.saldoConcluido || 0)), "azul"),
+        card("Execuções fiscais", n((r.efEmCurso || 0) + (r.efConcluido || 0)), "azul"))}
+    </div>
+    <div class="pg-b">
+      ${painel("Em curso — fluxo PTAC",
+        card("Processos em curso", n(r.casosEmCurso), "laranja"),
+        card("Valor em curso", fmt(r.saldoEmCurso), "laranja"),
+        card("Execuções fiscais em curso", n(r.efEmCurso), "laranja"))}
+      ${painel("Concluído — fluxo PTAC",
+        card("Processos concluídos", n(r.casosConcluidos), "verde"),
+        card("Tratamento adequado (valor)", fmt(r.saldoConcluido), "verde"),
+        card("Execuções fiscais extintas", n(r.efConcluido), "verde"))}
+    </div>
+    ${graficos}
+  </div>`;
 }
 
 /* ---------------- Contribuintes (lista por mes, somente leitura) ---------------- */
@@ -378,28 +505,63 @@ function cliqueLista(ev) {
 document.addEventListener("click", ev => { if (!ev.target.closest(".menu-wrap")) fecharMenu(); });
 document.addEventListener("keydown", ev => { if (ev.key === "Escape") fecharMenu(); });
 
-function avisar(texto) {
+// Baixa o PDF em PARTES (cada resposta com menos de ~1 MB) e junta no navegador.
+// Funciona tambem com o Code.gs antigo (que devolve o arquivo inteiro de uma vez).
+async function obterParecer(id, aoProgredir) {
+  const primeira = await api("baixarParecer", { id: id, parte: 0 });
+  if (!primeira || primeira.erro || !primeira.base64) throw new Error(primeira && primeira.erro ? primeira.erro : "falha ao obter o arquivo");
+  const total = Math.max(1, Number(primeira.partes) || 1);
+  const pedacos = new Array(total);
+  pedacos[0] = primeira.base64;
+  let concluidas = 1, proxima = 1, falhou = false;
+  if (aoProgredir) aoProgredir(concluidas, total);
+  async function trabalhador() {
+    while (!falhou && proxima < total) {
+      const i = proxima++;
+      try {
+        const r = await api("baixarParecer", { id: id, parte: i });
+        if (!r || r.erro || !r.base64 || Number(r.parte) !== i) throw new Error(r && r.erro ? r.erro : "a parte " + (i + 1) + " veio incompleta");
+        pedacos[i] = r.base64;
+        concluidas++;
+        if (aoProgredir) aoProgredir(concluidas, total);
+      } catch (e) { falhou = true; throw e; }
+    }
+  }
+  await Promise.all([trabalhador(), trabalhador(), trabalhador()]);
+  const partes = pedacos.map(b64 => {
+    const bin = atob(b64);
+    const u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return u8;
+  });
+  const tamanhoFinal = partes.reduce((s, p) => s + p.length, 0);
+  if (primeira.tamanho !== undefined && Number(primeira.tamanho) !== tamanhoFinal) throw new Error("download incompleto");
+  const bytes = new Uint8Array(tamanhoFinal);
+  let pos = 0;
+  partes.forEach(p => { bytes.set(p, pos); pos += p.length; });
+  return { nome: primeira.nome, mime: primeira.mime, bytes: bytes };
+}
+
+function avisar(texto, ms) {
   const t = document.getElementById("toast");
   t.textContent = texto; t.hidden = false;
   clearTimeout(avisar.tempo);
-  avisar.tempo = setTimeout(() => { t.hidden = true; }, 5000);
+  avisar.tempo = setTimeout(() => { t.hidden = true; }, ms || 5000);
 }
+function esconderAviso() { clearTimeout(avisar.tempo); document.getElementById("toast").hidden = true; }
 
 async function baixar(id, botao) {
   botao.disabled = true;
   try {
-    const r = await api("baixarParecer", { id: id });
-    if (!r || r.erro) throw new Error(r && r.erro ? r.erro : "falha ao obter o arquivo");
-    const bin = atob(r.base64);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    const url = URL.createObjectURL(new Blob([bytes], { type: r.mime || "application/pdf" }));
+    const r = await obterParecer(id, (feitas, total) => { if (total > 1) avisar("Baixando parecer… " + feitas + " de " + total, 60000); });
+    const url = URL.createObjectURL(new Blob([r.bytes], { type: r.mime || "application/pdf" }));
     const a = document.createElement("a");
     a.href = url; a.download = r.nome || "parecer.pdf";
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
+    esconderAviso();
   } catch (e) {
-    avisar("Não foi possível baixar este parecer agora. Tente novamente em instantes.");
+    avisar("Não foi possível baixar este parecer agora. Tente novamente em instantes.", 6000);
   } finally {
     botao.disabled = false;
   }
