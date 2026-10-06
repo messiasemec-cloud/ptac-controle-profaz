@@ -154,7 +154,6 @@ select:focus { border-color: var(--verde); }
 .seg-bar { display: flex; width: 100%; height: 8px; border-radius: 4px; overflow: hidden; background: #d8dcdf; }
 .seg-legenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--texto-sec); margin-top: 6px; }
 .seg-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
-.selo-contagem { display: inline-block; padding: 1px 7px; border-radius: 10px; background: #eef1f4; color: var(--texto-sec); font-weight: 600; font-size: 10.5px; margin-right: 5px; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 20px; }
 .modal-caixa { background: var(--branco); border-radius: var(--radius-lg); padding: 1.5rem; max-width: 560px; width: 100%; max-height: 85vh; overflow-y: auto; }
 .modal-titulo { font-family: 'Source Serif 4', serif; font-size: 17px; font-weight: 600; margin-bottom: 4px; }
@@ -312,16 +311,6 @@ select:focus { border-color: var(--verde); }
           <div class="scorecard compacto"><div class="scorecard-label">Tratamento adequado (valor)</div><div class="scorecard-valor verde pequeno" id="kpi-saldo-concluido">R$ 0</div></div>
           <div class="scorecard compacto"><div class="scorecard-label">Execucoes fiscais extintas</div><div class="scorecard-valor verde pequeno" id="kpi-ef-concluido">0</div></div>
         </div>
-      </div>
-
-      <div class="painel-card" style="margin-bottom:1.5rem;padding:1.25rem 1.5rem">
-        <div class="painel-titulo" style="margin-bottom:.75rem">Numero de CDAs — fluxo PTAC</div>
-        <div class="scorecards" style="grid-template-columns:repeat(3,1fr);margin-bottom:.75rem">
-          <div class="scorecard compacto"><div class="scorecard-label">Em curso</div><div class="scorecard-valor laranja pequeno" id="kpi-cdas-em-curso">0</div></div>
-          <div class="scorecard compacto"><div class="scorecard-label">Concluido</div><div class="scorecard-valor verde pequeno" id="kpi-cdas-concluido">0</div></div>
-          <div class="scorecard compacto"><div class="scorecard-label">Total instaurado</div><div class="scorecard-valor azul pequeno" id="kpi-cdas-total-instaurado">0</div></div>
-        </div>
-        <div id="barra-cdas"></div>
       </div>
 
     </div>
@@ -1894,24 +1883,6 @@ function saldoCaso(c) {
   return Number(c.SaldoDevedor) || 0;
 }
 
-function barraDuasCoresHtml(emCurso, concluido, formatarFn, contagens) {
-  const total = (Number(emCurso)||0) + (Number(concluido)||0);
-  if (total <= 0) return `<div style="font-size:12px;color:var(--texto-sec)">sem dado ainda</div>`;
-  const pctConcluido = concluido/total*100;
-  const pctEmCurso = Math.max(0, 100 - pctConcluido);
-  const seloEmCurso = contagens ? `<span class="selo-contagem">${contagens.emCurso} PTAC${contagens.emCurso===1?"":"s"}</span>` : "";
-  const seloConcluido = contagens ? `<span class="selo-contagem">${contagens.concluido} PTAC${contagens.concluido===1?"":"s"}</span>` : "";
-  return `
-    <div class="seg-bar">
-      <div style="width:${pctEmCurso}%;background:var(--laranja)"></div>
-      <div style="width:${pctConcluido}%;background:var(--verde)"></div>
-    </div>
-    <div class="seg-legenda">
-      <span><span class="seg-dot" style="background:var(--laranja)"></span>Em curso: ${seloEmCurso}${formatarFn(emCurso)} · ${pctEmCurso.toFixed(1)}% do total</span>
-      <span><span class="seg-dot" style="background:var(--verde)"></span>Concluido: ${seloConcluido}${formatarFn(concluido)} · ${pctConcluido.toFixed(1)}% do total</span>
-    </div>`;
-}
-
 const corPorFasePTAC = {
   "Instaurado": { bg: "#fdecea", texto: "#c0392b" },
   "Oficio expedido a SEFIN": { bg: "#fdeee2", texto: "#b8541f" },
@@ -1937,11 +1908,6 @@ async function renderPainel() {
   document.getElementById("kpi-ef-em-curso").textContent = numFmt(painel.efEmCurso);
   document.getElementById("kpi-ef-concluido").textContent = numFmt(painel.efConcluido);
   document.getElementById("kpi-ef-total-instaurado").textContent = numFmt(painel.efEmCurso + painel.efConcluido);
-
-  document.getElementById("kpi-cdas-em-curso").textContent = numFmt(painel.cdasEmCurso);
-  document.getElementById("kpi-cdas-concluido").textContent = numFmt(painel.cdasConcluido);
-  document.getElementById("kpi-cdas-total-instaurado").textContent = numFmt(painel.cdasEmCurso + painel.cdasConcluido);
-  document.getElementById("barra-cdas").innerHTML = barraDuasCoresHtml(painel.cdasEmCurso, painel.cdasConcluido, numFmt);
 }
 
 renderPainel();
