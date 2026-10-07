@@ -287,16 +287,21 @@ function render() {
 const AVISO_VERSAO = `<div class="aviso-versao"><b>Atenção:</b> os dados desta página estão incompletos porque o servidor (Code.gs) ainda não foi atualizado para a versão nova. Avise o administrador do sistema.</div>`;
 
 /* ---------------- Graficos (SVG, sem biblioteca) ---------------- */
-const GRUPOS_FASE = [
-  { rot: "Instaurado", cor: "#c62828", st: ["Instaurado"] },
-  { rot: "Em curso", cor: "#f9a825", st: null }, /* qualquer fase que nao seja Instaurado nem Concluido */
-  { rot: "Concluído", cor: "#2e7d32", st: ["Concluido", "Concluido/Extinto"] }
+const GRUPOS_FASE = [ /* mesmos nomes de fase da lista de Contribuintes / Andamento */
+  { rot: "Identificado", cor: "#9aa3ad", st: ["Identificado"] },
+  { rot: "Instaurado", cor: "#d64545", st: ["Instaurado"] },
+  { rot: "Ofício expedido à SEFIN", cor: "#e8892b", st: ["Oficio expedido a SEFIN"] },
+  { rot: "Elaboração de parecer", cor: "#e3b505", st: ["Elaboracao de parecer"] },
+  { rot: "Aprovação pela chefia", cor: "#6aa84f", st: ["Aprovacao pela chefia"] },
+  { rot: "Concluído", cor: "#0a8a7a", st: ["Concluido", "Concluido/Extinto"] }
 ];
+const COR_OUTROS = "#7e57c2";
 
 function dadosPizza(lista) {
-  const conhecidos = GRUPOS_FASE.filter(g => g.st).flatMap(g => g.st);
-  const fatias = GRUPOS_FASE.map(g => ({ rot: g.rot, cor: g.cor,
-    n: lista.filter(d => g.st ? g.st.includes(d.status) : !conhecidos.includes(d.status)).length }));
+  const conhecidos = GRUPOS_FASE.flatMap(g => g.st);
+  const fatias = GRUPOS_FASE.map(g => ({ rot: g.rot, cor: g.cor, n: lista.filter(d => g.st.includes(d.status)).length }));
+  const resto = lista.length - fatias.reduce((t, f) => t + f.n, 0);
+  if (resto > 0) fatias.push({ rot: "Outras fases", cor: COR_OUTROS, n: resto });
   return fatias.filter(f => f.n > 0);
 }
 
@@ -308,7 +313,7 @@ function caminhoRosca(cx, cy, r, ri, a0, a1) { // angulos em radianos; 0 = topo,
 
 function graficoPizzaHtml(lista) {
   const fatias = dadosPizza(lista), total = lista.length;
-  const titulo = `<h3>Distribuição por status (%)</h3>`;
+  const titulo = `<h3>Distribuição por status</h3>`;
   if (!total) return `${titulo}<div class="vazio">Sem dados.</div>`;
   let angulo = 0;
   const partes = fatias.map(f => {
@@ -320,7 +325,7 @@ function graficoPizzaHtml(lista) {
     angulo = a1;
     return forma;
   }).join("");
-  const legenda = fatias.map(f => `<li><i style="background:${f.cor}"></i><span class="rot">${esc(f.rot)} (${Math.round(f.n / total * 100)}%)</span></li>`).join("");
+  const legenda = fatias.map(f => `<li><i style="background:${f.cor}"></i><span class="rot">${esc(f.rot)} (${f.n})</span></li>`).join("");
   return `${titulo}<div class="pizza">
     <svg viewBox="0 0 100 100" role="img" aria-label="Gráfico de rosca: distribuição por status">${partes}</svg>
     <ul class="legenda">${legenda}</ul></div>`;
