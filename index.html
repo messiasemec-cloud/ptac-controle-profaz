@@ -96,6 +96,10 @@ select:focus { border-color: var(--verde); }
 .lista-acoes { display: flex; flex-direction: column; align-items: center; gap: 5px; }
 .btn-capa { background: none; border: none; cursor: pointer; padding: 3px; border-radius: 4px; color: var(--texto-sec); display: flex; align-items: center; justify-content: center; }
 .btn-capa:hover { background: rgba(0,0,0,.07); color: var(--verde-escuro); }
+.lista-icones { display: flex; align-items: center; gap: 2px; }
+.btn-parecer-ver { position: relative; background: none; border: none; cursor: pointer; padding: 3px; border-radius: 4px; color: #6b4a93; display: flex; align-items: center; justify-content: center; }
+.btn-parecer-ver:hover, .btn-parecer-ver:focus-visible { background: rgba(107,74,147,.12); color: #53367a; outline: none; }
+.btn-parecer-ver .qtd { position: absolute; top: -4px; right: -6px; background: #6b4a93; color: #fff; border-radius: 9px; font-size: 10px; font-weight: 700; min-width: 16px; height: 16px; line-height: 16px; text-align: center; padding: 0 4px; }
 .parecer-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid var(--cinza-borda); border-radius: var(--radius); margin-bottom: 6px; font-size: 13px; color: var(--texto); }
 .parecer-meta { color: var(--texto-sec); font-size: 12px; margin-top: 2px; }
 .parecer-btn { background: none; border: 1px solid var(--cinza-borda); border-radius: 6px; padding: 4px 10px; font-size: 12.5px; cursor: pointer; color: var(--texto); font-family: inherit; }
@@ -183,6 +187,33 @@ select:focus { border-color: var(--verde); }
   .header-top { padding: .75rem 1rem; }
   .form-card { padding: 1.25rem; }
 }
+/* VIZ-CSS-INICIO */
+.viz-fundo { position: fixed; inset: 0; background: rgba(26,31,36,.55); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 12px; }
+.viz-fundo[hidden] { display: none; }
+.viz-caixa { background: #fff; border-radius: 12px; width: min(1000px, 100%); height: min(92vh, 940px); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+.viz-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 14px 18px 10px; border-bottom: 1px solid #dde1e5; }
+.viz-info { min-width: 0; }
+.viz-devedor { font-size: 12px; color: #5a6472; }
+.viz-titulo { font-size: 16px; font-weight: 700; color: #1a1f24; overflow-wrap: anywhere; }
+.viz-meta { font-size: 12.5px; color: #5a6472; margin-top: 2px; }
+.viz-fechar { flex: none; width: 34px; height: 34px; border-radius: 50%; border: none; background: #f4f5f6; color: #1a1f24; font-size: 22px; line-height: 1; cursor: pointer; }
+.viz-fechar:hover, .viz-fechar:focus-visible { background: #e4e8ec; outline: none; }
+.viz-lista { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 18px; border-bottom: 1px solid #dde1e5; background: #f5f1fa; }
+.viz-lista[hidden] { display: none; }
+.viz-chip { background: #fff; border: 1.5px solid #ddd2ea; border-radius: 16px; padding: 4px 12px; font-family: inherit; font-size: 12.5px; font-weight: 600; color: #1a1f24; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viz-chip:hover { border-color: #6b4a93; }
+.viz-chip.ativo { background: #6b4a93; border-color: #6b4a93; color: #fff; }
+.viz-corpo { flex: 1; min-height: 0; background: #e4e8ec; display: flex; }
+.viz-pdf { flex: 1; width: 100%; height: 100%; border: 0; background: #fff; }
+.viz-estado { margin: auto; text-align: center; color: #5a6472; font-size: 14px; padding: 1rem; line-height: 1.6; }
+.viz-rodape { display: flex; gap: 8px; justify-content: flex-end; padding: 10px 18px; border-top: 1px solid #dde1e5; }
+.viz-btn { background: #fff; border: 1.5px solid #dde1e5; border-radius: 8px; padding: 8px 14px; font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; color: #1a1f24; }
+.viz-btn:hover { background: #f4f5f6; }
+.viz-prim { background: #0a8a7a; border-color: #0a8a7a; color: #fff; }
+.viz-prim:hover { background: #076b5e; }
+.viz-btn:disabled { opacity: .5; cursor: not-allowed; }
+@media (max-width: 640px) { .viz-fundo { padding: 0; } .viz-caixa { width: 100%; height: 100%; border-radius: 0; } .viz-rodape { flex-wrap: wrap; } .viz-btn { flex: 1; } }
+/* VIZ-CSS-FIM */
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -1318,6 +1349,7 @@ function renderBusca() {
   }
 
   const ICONE_DOWNLOAD = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+  const ICONE_DOC = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`;
 
   visiveis.forEach(c => {
     const row = document.createElement("div");
@@ -1336,6 +1368,10 @@ function renderBusca() {
     const linhaValor = `${fmt(saldoDevedor)} · ${nExec} execucoes · ${nCdas} CDAs`;
 
     const hInfo = hipoteseInfo(c.HipoteseIncidencia);
+    const pareceresCaso = c.pareceres || [];
+    const btnParecer = pareceresCaso.length
+      ? `<button class="btn-parecer-ver" title="${pareceresCaso.length > 1 ? "Clique aqui para visualizar os pareceres" : "Clique aqui para visualizar o parecer"}" aria-label="Visualizar parecer de ${escHtml(c.Devedor)}">${ICONE_DOC}${pareceresCaso.length > 1 ? `<span class="qtd">${pareceresCaso.length}</span>` : ""}</button>`
+      : "";
 
     row.innerHTML = `
       <div class="avatar">${iniciais(c.Devedor)}</div>
@@ -1345,10 +1381,12 @@ function renderBusca() {
       </div>
       <div class="lista-acoes">
         ${selo}
-        <button class="btn-capa" title="Gerar Capa PTAC">${ICONE_DOWNLOAD}</button>
+        <div class="lista-icones">${btnParecer}<button class="btn-capa" title="Gerar Capa PTAC">${ICONE_DOWNLOAD}</button></div>
       </div>`;
 
     row.querySelector(".btn-capa").onclick = (e) => { e.stopPropagation(); gerarCapaPTAC(c.ID); };
+    const btnVer = row.querySelector(".btn-parecer-ver");
+    if (btnVer) btnVer.onclick = (e) => { e.stopPropagation(); abrirVisualizador({ devedor: c.Devedor, pareceres: pareceresCaso }); };
     lista.appendChild(row);
   });
 
@@ -1594,6 +1632,23 @@ async function obterParecer(id, aoProgredir) {
   return { nome: primeira.nome, mime: primeira.mime, bytes: bytes };
 }
 
+const pareceresFicha = {};   // ultima lista de pareceres carregada por caso (usada pelo botao Visualizar)
+
+// mantem o indicador de parecer da lista do Andamento em dia depois de anexar/remover
+function sincronizarIndicadorLista(casoId, lista) {
+  if (typeof casos === "undefined") return;
+  const caso = casos.find(c => String(c.ID) === String(casoId));
+  if (!caso) return;
+  const mudou = (caso.pareceres || []).length !== lista.length;
+  caso.pareceres = lista;
+  if (mudou && typeof renderBusca === "function") renderBusca();
+}
+
+function visualizarParecerFicha(id, casoId) {
+  const caso = (typeof casos !== "undefined") ? casos.find(c => String(c.ID) === String(casoId)) : null;
+  abrirVisualizador({ devedor: caso ? caso.Devedor : "", pareceres: pareceresFicha[casoId] || [], idInicial: id });
+}
+
 async function carregarPareceresFicha(casoId) {
   const alvoInicial = document.getElementById("lista-pareceres-" + casoId);
   if (!alvoInicial) return;
@@ -1613,6 +1668,8 @@ async function carregarPareceresFicha(casoId) {
   const alvo = document.getElementById("lista-pareceres-" + casoId);
   if (!alvo) return;
   if (!Array.isArray(lista)) { alvo.textContent = "Não foi possível carregar os pareceres" + (lista && lista.erro ? ": " + lista.erro : "."); return; }
+  pareceresFicha[casoId] = lista;
+  sincronizarIndicadorLista(casoId, lista);
   if (!lista.length) { alvo.textContent = "Nenhum parecer anexado ainda."; return; }
   lista.sort((a, b) => Number(b.id) - Number(a.id));
   alvo.innerHTML = lista.map(p => {
@@ -1624,6 +1681,7 @@ async function carregarPareceresFicha(casoId) {
         <div class="parecer-meta">${escHtml(p.autor)}${data ? " · " + data : ""} · ${formatarTamanhoArquivo(p.tamanho)}</div>
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="parecer-btn" onclick="visualizarParecerFicha('${p.id}', '${casoId}')">Visualizar</button>
         <button class="parecer-btn" onclick="baixarParecerFicha('${p.id}', this)">Baixar</button>
         <button class="parecer-btn perigo" onclick="removerParecerFicha('${p.id}', '${casoId}')">Remover</button>
       </div>
@@ -1686,6 +1744,154 @@ async function anexarParecer(casoId) {
   }
 }
 
+/* VIZ-JS-INICIO */
+// Visualizador de parecer (PDF) numa janela sobre a tela. Depende de obterParecer(id, aoProgredir).
+const VIZ_MAX_CACHE = 3;   // ultimos PDFs mantidos na memoria (reabrir e instantaneo)
+const viz = { fundo: null, cache: new Map(), seq: 0, aberto: false, devedor: "", pareceres: [], atual: null, foco: null, overflow: "" };
+
+function vizEsc(t) {
+  return String(t === undefined || t === null ? "" : t)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+function vizTamanho(b) {
+  b = Number(b) || 0;
+  return b >= 1048576 ? (b / 1048576).toFixed(1).replace(".", ",") + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
+}
+function vizData(d) { const dt = new Date(d); return isNaN(dt) ? "" : dt.toLocaleDateString("pt-BR"); }
+// Android/celular nao mostram PDF dentro da pagina: nesse caso so oferecemos Baixar / Abrir em nova aba
+function vizPdfInline() { return typeof navigator.pdfViewerEnabled === "boolean" ? navigator.pdfViewerEnabled : true; }
+
+function vizBaixarBytes(bytes, nome, mime) {
+  const url = URL.createObjectURL(new Blob([bytes], { type: mime || "application/pdf" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = nome || "parecer.pdf";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+function vizCriar() {
+  const f = document.createElement("div");
+  f.className = "viz-fundo"; f.hidden = true;
+  f.setAttribute("role", "dialog"); f.setAttribute("aria-modal", "true"); f.setAttribute("aria-labelledby", "viz-titulo");
+  f.innerHTML = `<div class="viz-caixa">
+    <div class="viz-topo">
+      <div class="viz-info"><div class="viz-devedor"></div><div class="viz-titulo" id="viz-titulo"></div><div class="viz-meta"></div></div>
+      <button type="button" class="viz-fechar" data-viz="fechar" aria-label="Fechar">×</button>
+    </div>
+    <div class="viz-lista" hidden></div>
+    <div class="viz-corpo"></div>
+    <div class="viz-rodape">
+      <button type="button" class="viz-btn viz-prim" data-viz="baixar" disabled>Baixar</button>
+      <button type="button" class="viz-btn" data-viz="nova" disabled>Abrir em nova aba</button>
+    </div>
+  </div>`;
+  f.addEventListener("click", ev => {
+    if (ev.target === f) { vizFechar(); return; }
+    const chip = ev.target.closest("[data-viz-id]");
+    if (chip) { vizMostrar(chip.dataset.vizId); return; }
+    const b = ev.target.closest("[data-viz]");
+    if (!b) return;
+    const entrada = viz.cache.get(String(viz.atual));
+    if (b.dataset.viz === "fechar") vizFechar();
+    else if (b.dataset.viz === "baixar" && entrada) vizBaixarBytes(entrada.bytes, entrada.nome, entrada.mime);
+    else if (b.dataset.viz === "nova" && entrada) window.open(entrada.url, "_blank");
+    else if (b.dataset.viz === "tentar") vizMostrar(viz.atual);
+  });
+  document.body.appendChild(f);
+  document.addEventListener("keydown", vizTecla);
+  return f;
+}
+
+function vizTecla(ev) {
+  if (!viz.aberto) return;
+  if (ev.key === "Escape") { ev.preventDefault(); vizFechar(); return; }
+  if (ev.key !== "Tab") return;
+  const focaveis = [...viz.fundo.querySelectorAll("button:not([disabled])")].filter(e => !e.closest("[hidden]"));
+  if (!focaveis.length) { ev.preventDefault(); return; }
+  const primeiro = focaveis[0], ultimo = focaveis[focaveis.length - 1], ativo = document.activeElement;
+  if (!viz.fundo.contains(ativo)) { ev.preventDefault(); primeiro.focus(); }
+  else if (ev.shiftKey && ativo === primeiro) { ev.preventDefault(); ultimo.focus(); }
+  else if (!ev.shiftKey && ativo === ultimo) { ev.preventDefault(); primeiro.focus(); }
+}
+
+function vizGuardar(id, r) {
+  if (viz.cache.has(id)) return viz.cache.get(id);
+  const mime = r.mime || "application/pdf";
+  const entrada = { nome: r.nome, mime: mime, bytes: r.bytes, url: URL.createObjectURL(new Blob([r.bytes], { type: mime })) };
+  viz.cache.set(id, entrada);
+  for (const chave of [...viz.cache.keys()]) {   // descarta o mais antigo (nunca o que esta na tela)
+    if (viz.cache.size <= VIZ_MAX_CACHE) break;
+    if (chave === String(viz.atual) || chave === id) continue;
+    URL.revokeObjectURL(viz.cache.get(chave).url);
+    viz.cache.delete(chave);
+  }
+  return entrada;
+}
+
+async function vizMostrar(id) {
+  id = String(id);
+  const p = viz.pareceres.find(x => String(x.id) === id);
+  if (!p) return;
+  viz.atual = id;
+  const seq = ++viz.seq, f = viz.fundo, corpo = f.querySelector(".viz-corpo");
+  f.querySelector(".viz-titulo").textContent = p.titulo || p.nomeArquivo;
+  f.querySelector(".viz-meta").textContent = [p.autor, vizData(p.data), vizTamanho(p.tamanho)].filter(Boolean).join(" · ");
+  f.querySelectorAll(".viz-chip").forEach(c => c.classList.toggle("ativo", c.dataset.vizId === id));
+  const baixar = f.querySelector('[data-viz="baixar"]'), nova = f.querySelector('[data-viz="nova"]');
+  baixar.disabled = true; nova.disabled = true;
+
+  let entrada = viz.cache.get(id);
+  if (entrada) { viz.cache.delete(id); viz.cache.set(id, entrada); }   // marca como o mais recente
+  else {
+    corpo.innerHTML = `<div class="viz-estado">Carregando…</div>`;
+    try {
+      const r = await obterParecer(id, (feitas, total) => {
+        if (seq === viz.seq && viz.aberto && total > 1) corpo.innerHTML = `<div class="viz-estado">Carregando… ${feitas} de ${total}</div>`;
+      });
+      const guardado = vizGuardar(id, r);
+      if (seq !== viz.seq || !viz.aberto) return;   // o usuario ja trocou de parecer ou fechou: so deixa no cache
+      entrada = guardado;
+    } catch (e) {
+      if (seq !== viz.seq || !viz.aberto) return;
+      corpo.innerHTML = `<div class="viz-estado">Não foi possível carregar este parecer.<br><button type="button" class="viz-btn" data-viz="tentar">Tentar de novo</button></div>`;
+      return;
+    }
+  }
+  baixar.disabled = false; nova.disabled = false;
+  corpo.innerHTML = vizPdfInline()
+    ? `<iframe class="viz-pdf" title="${vizEsc(p.titulo || p.nomeArquivo)}" src="${vizEsc(entrada.url)}#toolbar=1&navpanes=0&view=FitH"></iframe>`
+    : `<div class="viz-estado">Este navegador não mostra PDF nesta tela.<br>Use <b>Baixar</b> ou <b>Abrir em nova aba</b>.</div>`;
+}
+
+function abrirVisualizador(opcoes) {
+  const lista = (opcoes.pareceres || []).slice().sort((a, b) => Number(b.id) - Number(a.id));
+  if (!lista.length) return;
+  if (!viz.fundo) viz.fundo = vizCriar();
+  viz.devedor = opcoes.devedor || ""; viz.pareceres = lista;
+  if (!viz.aberto) { viz.foco = document.activeElement; viz.overflow = document.body.style.overflow; }
+  document.body.style.overflow = "hidden";
+  viz.aberto = true; viz.fundo.hidden = false;
+  viz.fundo.querySelector(".viz-devedor").textContent = viz.devedor;
+  const caixaLista = viz.fundo.querySelector(".viz-lista");
+  caixaLista.hidden = lista.length < 2;
+  caixaLista.innerHTML = lista.length < 2 ? "" : lista.map(p => {
+    const dica = [p.autor, vizData(p.data)].filter(Boolean).join(" · ");
+    return `<button type="button" class="viz-chip" data-viz-id="${vizEsc(p.id)}" title="${vizEsc(dica)}">${vizEsc(p.titulo || p.nomeArquivo)}</button>`;
+  }).join("");
+  const inicial = lista.find(p => String(p.id) === String(opcoes.idInicial)) || lista[0];
+  vizMostrar(inicial.id);
+  viz.fundo.querySelector(".viz-fechar").focus();
+}
+
+function vizFechar() {
+  if (!viz.aberto) return;
+  viz.aberto = false; viz.seq++;
+  viz.fundo.hidden = true;
+  viz.fundo.querySelector(".viz-corpo").innerHTML = "";   // descarrega o visualizador de PDF
+  document.body.style.overflow = viz.overflow;
+  if (viz.foco && typeof viz.foco.focus === "function") viz.foco.focus();
+}
+/* VIZ-JS-FIM */
 function melhorCombinacao(itensBens, patrimonio) {
   const cap = Math.floor(Math.max(0, Number(patrimonio) || 0));
   const lista = itensBens.map(b => ({ b: b, v: Math.round(Number(b.Saldo)||0) })).filter(x => x.v > 0);
