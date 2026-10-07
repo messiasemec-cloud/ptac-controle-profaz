@@ -288,43 +288,41 @@ const AVISO_VERSAO = `<div class="aviso-versao"><b>Atenção:</b> os dados desta
 
 /* ---------------- Graficos (SVG, sem biblioteca) ---------------- */
 const GRUPOS_FASE = [
-  { rot: "Instaurado", cor: "#d64545", st: ["Instaurado"] },
-  { rot: "Ofício expedido à SEFIN", cor: "#e8892b", st: ["Oficio expedido a SEFIN"] },
-  { rot: "Elaboração de parecer", cor: "#e3b505", st: ["Elaboracao de parecer"] },
-  { rot: "Aprovação pela chefia", cor: "#6aa84f", st: ["Aprovacao pela chefia"] },
-  { rot: "Concluído", cor: "#0a8a7a", st: ["Concluido", "Concluido/Extinto"] }
+  { rot: "Instaurado", cor: "#c62828", st: ["Instaurado"] },
+  { rot: "Em curso", cor: "#f9a825", st: null }, /* qualquer fase que nao seja Instaurado nem Concluido */
+  { rot: "Concluído", cor: "#2e7d32", st: ["Concluido", "Concluido/Extinto"] }
 ];
-const COR_OUTROS = "#9aa3ad";
 
 function dadosPizza(lista) {
-  const fatias = GRUPOS_FASE.map(g => ({ rot: g.rot, cor: g.cor, n: lista.filter(d => g.st.includes(d.status)).length }));
-  const resto = lista.length - fatias.reduce((s, f) => s + f.n, 0);
-  fatias.push({ rot: "Identificado / outros", cor: COR_OUTROS, n: resto });
+  const conhecidos = GRUPOS_FASE.filter(g => g.st).flatMap(g => g.st);
+  const fatias = GRUPOS_FASE.map(g => ({ rot: g.rot, cor: g.cor,
+    n: lista.filter(d => g.st ? g.st.includes(d.status) : !conhecidos.includes(d.status)).length }));
   return fatias.filter(f => f.n > 0);
 }
 
-function caminhoFatia(cx, cy, r, a0, a1) { // angulos em radianos; 0 = topo, sentido horario
-  const x0 = cx + r * Math.sin(a0), y0 = cy - r * Math.cos(a0), x1 = cx + r * Math.sin(a1), y1 = cy - r * Math.cos(a1);
-  return `M${cx},${cy} L${x0.toFixed(2)},${y0.toFixed(2)} A${r},${r} 0 ${(a1 - a0) > Math.PI ? 1 : 0} 1 ${x1.toFixed(2)},${y1.toFixed(2)} Z`;
+function caminhoRosca(cx, cy, r, ri, a0, a1) { // angulos em radianos; 0 = topo, sentido horario
+  const P = (rr, a) => `${(cx + rr * Math.sin(a)).toFixed(2)},${(cy - rr * Math.cos(a)).toFixed(2)}`;
+  const g = (a1 - a0) > Math.PI ? 1 : 0;
+  return `M${P(r, a0)} A${r},${r} 0 ${g} 1 ${P(r, a1)} L${P(ri, a1)} A${ri},${ri} 0 ${g} 0 ${P(ri, a0)} Z`;
 }
 
 function graficoPizzaHtml(lista) {
   const fatias = dadosPizza(lista), total = lista.length;
-  const titulo = `<h3>PTACs por fase</h3>`;
+  const titulo = `<h3>Distribuição por status (%)</h3>`;
   if (!total) return `${titulo}<div class="vazio">Sem dados.</div>`;
   let angulo = 0;
   const partes = fatias.map(f => {
     const a1 = angulo + (f.n / total) * 2 * Math.PI;
     const dica = `${f.rot}: ${plural(f.n, "PTAC", "PTACs")} (${Math.round(f.n / total * 100)}%)`;
     const forma = fatias.length === 1
-      ? `<circle cx="50" cy="50" r="48" fill="${f.cor}"><title>${esc(dica)}</title></circle>`
-      : `<path d="${caminhoFatia(50, 50, 48, angulo, a1)}" fill="${f.cor}" stroke="#fff" stroke-width="1.2"><title>${esc(dica)}</title></path>`;
+      ? `<path d="M50,2 A48,48 0 1 1 49.99,2 Z M50,24 A26,26 0 1 0 50.01,24 Z" fill-rule="evenodd" fill="${f.cor}"><title>${esc(dica)}</title></path>`
+      : `<path d="${caminhoRosca(50, 50, 48, 26, angulo, a1)}" fill="${f.cor}" stroke="#fff" stroke-width="1"><title>${esc(dica)}</title></path>`;
     angulo = a1;
     return forma;
   }).join("");
-  const legenda = fatias.map(f => `<li><i style="background:${f.cor}"></i><span class="rot">${esc(f.rot)}</span><b>${f.n}</b></li>`).join("");
+  const legenda = fatias.map(f => `<li><i style="background:${f.cor}"></i><span class="rot">${esc(f.rot)} (${Math.round(f.n / total * 100)}%)</span></li>`).join("");
   return `${titulo}<div class="pizza">
-    <svg viewBox="0 0 100 100" role="img" aria-label="Gráfico de pizza: PTACs por fase">${partes}</svg>
+    <svg viewBox="0 0 100 100" role="img" aria-label="Gráfico de rosca: distribuição por status">${partes}</svg>
     <ul class="legenda">${legenda}</ul></div>`;
 }
 
