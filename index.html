@@ -261,6 +261,15 @@ select:focus { border-color: var(--verde); }
         <div class="form-sub">Preencha os dados do devedor para incluir no controle</div>
 
         <div class="field">
+          <label>Eixo</label>
+          <select id="f-eixo" onchange="escolherEixoForm(this.value)">
+            <option value="PTAC">PTAC</option>
+            <option value="Falencia">Falência</option>
+            <option value="Inventario">Inventário</option>
+          </select>
+        </div>
+
+        <div class="field">
           <label>Hipotese de incidencia (Art. 5º, §1º, Portaria 53/2026-GPG)</label>
           <button type="button" class="btn-buscar" style="background:var(--branco);color:var(--texto);border:1.5px solid var(--cinza-borda);text-align:left;font-weight:400" onclick="abrirModalHipotese()">
             <span id="hipotese-resumo">Selecionar hipotese...</span>
@@ -1245,6 +1254,26 @@ function mostrarPagina(nome) {
   if (nome === "painel") { renderPainel(); }
 }
 
+function escolherEixoForm(valor) {
+  eixoSelecionado = valor;
+  document.getElementById("bloco-inventario").style.display = (valor === "Inventario") ? "block" : "none";
+  // sugestao do tipo de devedor conforme o eixo (pode ser trocado)
+  const tipo = document.getElementById("f-tipo");
+  if (valor === "Falencia") tipo.value = "Massa falida";
+  else if (valor === "Inventario") tipo.value = "Espolio";
+  else if (valor === "PTAC" && (tipo.value === "Massa falida" || tipo.value === "Espolio")) tipo.value = "Pessoa juridica";
+}
+
+async function alterarEixoCaso(id, valor) {
+  const c = casos.find(x => String(x.ID) === String(id));
+  const nomes = { PTAC: "PTAC", Falencia: "Falência", Inventario: "Inventário" };
+  if (!c || !confirm(`Mudar o eixo de "${c.Devedor}" para ${nomes[valor] || valor}?`)) { renderFicha(); return; }
+  await api("atualizarCampoCaso", { id: id, campo: "eixo", valor: valor });
+  await carregarCasos();
+  renderFicha();
+  renderBusca();
+}
+
 async function registrarCaso() {
   const devedor = document.getElementById("f-devedor").value.trim();
   if (!devedor) return;
@@ -1616,6 +1645,14 @@ async function renderFicha() {
         <label>Status do caso (${fase === "PTAC" ? "fluxo PTAC" : "triagem"})</label>
         <select id="ficha-status" onchange="atualizarStatusCaso('${c.ID}', this.value)">
           ${listaStatus.map(s => `<option value="${s}" ${s===c.Status?"selected":""}>${rotuloStatus(s)}</option>`).join("")}
+        </select>
+      </div>
+      <div class="field">
+        <label>Eixo</label>
+        <select onchange="alterarEixoCaso('${c.ID}', this.value)">
+          <option value="PTAC" ${eixoChave(c) === "ptac" ? "selected" : ""}>PTAC</option>
+          <option value="Falencia" ${eixoChave(c) === "falencia" ? "selected" : ""}>Falência</option>
+          <option value="Inventario" ${eixoChave(c) === "inventario" ? "selected" : ""}>Inventário</option>
         </select>
       </div>
       ${fase === "PTAC" ? blocoAprovacaoFicha(c) : ""}
