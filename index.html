@@ -162,6 +162,14 @@ select:focus { border-color: var(--verde); }
 .prog-row:last-child { border-bottom: none; }
 .prog-row.concluido { border-left-color: var(--verde); background: #f1f9f6; }
 .selo-fase { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.chip-etapa { display:inline-flex; align-items:center; gap:6px; padding:5px 11px; margin:0 6px 6px 0; border:1.5px solid var(--cinza-borda); border-radius:20px; font-size:13px; cursor:pointer; background:var(--branco); }
+.chip-etapa input { width:auto; margin:0; }
+.chip-etapa.on { border-color:var(--verde); background:#e1f5ee; color:#076b5e; font-weight:600; }
+.apr-linha { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 0; border-bottom:1px solid var(--cinza-borda); }
+.apr-linha:last-child { border-bottom:none; }
+.apr-linha input[type="checkbox"] { width:18px; height:18px; }
+.apr-linha input[type="date"] { width:auto; padding:6px 10px; border:1.5px solid var(--cinza-borda); border-radius:8px; font-family:inherit; font-size:14px; }
+.etapa-linha { font-size:12.5px; color:var(--texto-sec); margin-top:3px; }
 .prog-topo { display: flex; justify-content: space-between; margin-bottom: 8px; }
 .bbg { width: 100%; height: 6px; border-radius: 3px; background: var(--cinza-borda); overflow: hidden; }
 .bfill { height: 100%; border-radius: 3px; background: var(--verde); }
@@ -312,6 +320,15 @@ select:focus { border-color: var(--verde); }
         <div class="form-title">Buscar devedor</div>
         <div class="form-sub">Digite o nome para localizar o caso</div>
         <input type="text" id="busca-devedor" placeholder="Ex: Orgal, Panorama..." oninput="listaFocoId=null; renderBusca()">
+        <select id="filtro-etapa" onchange="listaFocoId=null; renderBusca()" style="margin-top:8px" aria-label="Filtrar por quem está com o caso">
+          <option value="">Com quem está: todos</option>
+          <option value="Dr. Neto">Com o Dr. Neto</option>
+          <option value="Gabriel">Com o Gabriel</option>
+          <option value="André">Com o André</option>
+          <option value="CEDAT">Com a CEDAT</option>
+          <option value="SEFIN">Com a SEFIN</option>
+          <option value="Procurador da execução fiscal">Com o procurador da execução fiscal</option>
+        </select>
         <div id="lista-busca" style="margin-top:12px"></div>
       </div>
       <div id="ficha-caso"></div>
@@ -687,7 +704,7 @@ async function gerarRelatorioDocx(dados) {
     } else {
       rows = lista.map((c, i) => {
         const info = hipoteseInfo(c.HipoteseIncidencia);
-        const vals = [c.Devedor || "", c.Documento || "", String(c.NumeroCDAs || 0), fmt(saldoCasoPDF(c)), String(c.NumeroExecucoesFiscais || 0), info ? info.citacao : "Nao informada", formatarDataBR(c[campoData]), c.Status || ""];
+        const vals = [c.Devedor || "", c.Documento || "", String(c.NumeroCDAs || 0), fmt(saldoCasoPDF(c)), String(c.NumeroExecucoesFiscais || 0), info ? info.citacao : "Nao informada", formatarDataBR(c[campoData]), rotuloStatus(c.Status || "")];
         const aligns = ["left", "center", "center", "right", "center", "left", "center", "left"];
         const fillLinha = i % 2 === 1 ? "F0F3F7" : undefined;
         return "<w:tr>" + vals.map((v, vi) => wCell(v, { w: COLS_W[vi], align: aligns[vi], fill: fillLinha, sz: 13 })).join("") + "</w:tr>";
@@ -997,7 +1014,7 @@ async function gerarRelatorio(periodo) {
         { label: "Exec. fiscais", w: larguras[4], get: c => String(c.NumeroExecucoesFiscais || 0), total: "ef" },
         { label: "Hipotese normativa", w: larguras[5], get: c => (hipoteseInfo(c.HipoteseIncidencia) || {}).citacao || "Nao informada" },
         { label: labelData, w: larguras[6], get: c => formatarDataBR(c[campoData]) },
-        { label: "Status", w: larguras[7], get: c => c.Status || "" }
+        { label: "Status", w: larguras[7], get: c => rotuloStatus(c.Status || "") }
       ];
     }
 
@@ -1310,6 +1327,161 @@ async function sairEdicaoValor(el, bemId) {
   await atualizarBem(bemId, "saldo", novo);
 }
 
+// ---- Fluxo PTAC: rotulos, etapas ("com quem esta") e aprovacao 1/2 ----
+// O valor guardado na planilha continua "Aprovacao pela chefia"; so o texto exibido muda.
+const ROTULO_STATUS = { "Aprovacao pela chefia": "Aguardando aprovacao da chefia" };
+function rotuloStatus(s) { return ROTULO_STATUS[s] || s; }
+
+const ETAPAS = ["Dr. Neto", "Gabriel", "André", "CEDAT", "SEFIN", "Procurador da execução fiscal"];
+
+function dataLocal(iso) {
+  const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+}
+function fmtIso(iso) { const d = dataLocal(iso); return d ? d.toLocaleDateString("pt-BR") : ""; }
+function hojeIso() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function diasDesde(iso) {
+  const d = dataLocal(iso);
+  return d ? Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000)) : null;
+}
+function textoDias(n) { return n === null ? "" : (n === 0 ? "hoje" : (n === 1 ? "há 1 dia" : "há " + n + " dias")); }
+
+function etapasDoCaso(c) { return String(c.EtapaAtual || "").split(" + ").map(x => x.trim()).filter(Boolean); }
+function aprovacoesFeitas(c) { return (c.DataHomologacaoGabriel ? 1 : 0) + (c.DataAprovacaoAndre ? 1 : 0); }
+
+// Sugestao automatica (sempre editavel pela equipe):
+function sugerirEtapas(c) {
+  switch (c.Status) {
+    case "Instaurado": return ["Dr. Neto"];
+    case "Oficio expedido a SEFIN": return ["SEFIN"];
+    case "Elaboracao de parecer": return ["Dr. Neto"];
+    case "Aprovacao pela chefia":
+      if (!c.DataHomologacaoGabriel) return ["Gabriel"];
+      if (!c.DataAprovacaoAndre) return ["André"];
+      return ["SEFIN", "Dr. Neto"];
+    case "Em cumprimento": return ["SEFIN", "Dr. Neto"];
+    default: return [];
+  }
+}
+
+function quemRegistra() { try { return localStorage.getItem("ptac_quem") || ""; } catch (e) { return ""; } }
+function definirQuemRegistra(v) { try { localStorage.setItem("ptac_quem", v); } catch (e) {} }
+
+async function aplicarSugestaoEtapa(id) {
+  const c = casos.find(x => String(x.ID) === String(id));
+  if (!c || (c.Fase || (c.Eixo === "PTAC" ? "PTAC" : "Triagem")) !== "PTAC") return;
+  const sug = sugerirEtapas(c).join(" + ");
+  if (sug === (c.EtapaAtual || "")) return;
+  await api("atualizarMarcoCaso", { id: id, campo: "etapa", valor: sug, data: sug ? hojeIso() : "", quem: quemRegistra() });
+  await carregarCasos();
+}
+
+async function salvarEtapas(id, soData) {
+  const c = casos.find(x => String(x.ID) === String(id));
+  const marcadas = [...document.querySelectorAll(`input[name="etapa-${id}"]:checked`)].map(i => i.value);
+  const antes = etapasDoCaso(c);
+  const entrouNova = marcadas.some(e => !antes.includes(e));
+  const campoData = document.getElementById("etapa-data-" + id);
+  let data = campoData && campoData.value ? campoData.value : hojeIso();
+  if (entrouNova && !soData) data = hojeIso();
+  if (!marcadas.length) data = "";
+  await api("atualizarMarcoCaso", { id: id, campo: "etapa", valor: marcadas.join(" + "), data: data, quem: quemRegistra() });
+  await carregarCasos();
+  renderFicha(); renderBusca();
+}
+
+async function usarSugestaoEtapa(id) {
+  const c = casos.find(x => String(x.ID) === String(id));
+  const sug = sugerirEtapas(c).join(" + ");
+  await api("atualizarMarcoCaso", { id: id, campo: "etapa", valor: sug, data: sug ? hojeIso() : "", quem: quemRegistra() });
+  await carregarCasos();
+  renderFicha(); renderBusca();
+}
+
+async function marcarAprovacao(id, tipo, marcado) {
+  const c = casos.find(x => String(x.ID) === String(id));
+  const nome = tipo === "homologacao" ? "homologação do Gabriel" : "aprovação do André";
+  if (marcado && tipo === "aprovacao" && !c.DataHomologacaoGabriel) {
+    alert("Marque primeiro a homologação do Gabriel: a aprovação do André vem depois dela.");
+    renderFicha(); return;
+  }
+  if (!marcado) {
+    if (tipo === "homologacao" && c.DataAprovacaoAndre) {
+      alert("Desmarque primeiro a aprovação do André.");
+      renderFicha(); return;
+    }
+    if (!confirm("Desmarcar a " + nome + "?")) { renderFicha(); return; }
+  }
+  const campoData = document.getElementById("apr-data-" + tipo + "-" + id);
+  const data = marcado ? ((campoData && campoData.value) || hojeIso()) : "";
+  await api("atualizarMarcoCaso", { id: id, campo: tipo, data: data, quem: quemRegistra() });
+  await carregarCasos();
+  await aplicarSugestaoEtapa(id);
+  const c2 = casos.find(x => String(x.ID) === String(id));
+  if (marcado && aprovacoesFeitas(c2) === 2 && c2.Status === "Aprovacao pela chefia") {
+    if (confirm("As duas aprovações foram registradas.\n\nMover o caso para \"Em cumprimento\"?")) {
+      await atualizarStatusCaso(id, "Em cumprimento");
+      return;
+    }
+  }
+  renderFicha(); renderBusca();
+}
+
+async function mudarDataAprovacao(id, tipo) {
+  const campoData = document.getElementById("apr-data-" + tipo + "-" + id);
+  if (!campoData || !campoData.value) return;
+  await api("atualizarMarcoCaso", { id: id, campo: tipo, data: campoData.value, quem: quemRegistra() });
+  await carregarCasos();
+  renderFicha();
+}
+
+function blocoEtapaFicha(c) {
+  const sel = etapasDoCaso(c);
+  const sug = sugerirEtapas(c);
+  const dias = diasDesde(c.DataEntradaEtapa);
+  const chips = ETAPAS.map(e => `<label class="chip-etapa ${sel.includes(e) ? "on" : ""}"><input type="checkbox" name="etapa-${c.ID}" value="${e}" ${sel.includes(e) ? "checked" : ""} onchange="salvarEtapas('${c.ID}')"> ${e}</label>`).join("");
+  const sugTxt = sug.length ? sug.join(" + ") : "nenhuma";
+  const igual = sug.join(" + ") === sel.join(" + ");
+  return `
+    <div class="field bloco">
+      <label>Com quem está</label>
+      <div>${chips}</div>
+      ${sel.length ? `<div class="etapa-linha">Desde <input type="date" id="etapa-data-${c.ID}" value="${c.DataEntradaEtapa || ""}" onchange="salvarEtapas('${c.ID}', true)" style="width:auto;padding:4px 8px;font-size:13px;display:inline-block"> ${dias !== null ? "· " + textoDias(dias) : ""}</div>` : `<div class="etapa-linha">Nenhuma etapa registrada.</div>`}
+      ${igual ? "" : `<div class="etapa-linha">Sugestão pelo status: <b>${sugTxt}</b> · <a href="#" style="color:var(--verde);text-decoration:underline" onclick="usarSugestaoEtapa('${c.ID}'); return false;">usar sugestão</a></div>`}
+      <div class="etapa-linha" style="margin-top:8px">Registrando como:
+        <select style="width:auto;padding:3px 8px;font-size:13px;display:inline-block" onchange="definirQuemRegistra(this.value)">
+          <option value="" ${!quemRegistra() ? "selected" : ""}>(não informar)</option>
+          <option value="Dr. Neto" ${quemRegistra() === "Dr. Neto" ? "selected" : ""}>Dr. Neto</option>
+          <option value="Letícia" ${quemRegistra() === "Letícia" ? "selected" : ""}>Letícia</option>
+        </select>
+      </div>
+    </div>`;
+}
+
+function blocoAprovacaoFicha(c) {
+  const hom = c.DataHomologacaoGabriel || "", apr = c.DataAprovacaoAndre || "";
+  if (c.Status !== "Aprovacao pela chefia" && !hom && !apr) return "";
+  const n = aprovacoesFeitas(c);
+  return `
+    <div class="field bloco">
+      <label>Aprovação da chefia · ${n} de 2</label>
+      <div class="apr-linha">
+        <input type="checkbox" ${hom ? "checked" : ""} onchange="marcarAprovacao('${c.ID}','homologacao',this.checked)" aria-label="Homologação do Procurador-Chefe">
+        <span style="min-width:230px"><b>Homologação</b> · Procurador-Chefe (Gabriel)</span>
+        <input type="date" id="apr-data-homologacao-${c.ID}" value="${hom}" ${hom ? "" : "disabled"} onchange="mudarDataAprovacao('${c.ID}','homologacao')">
+      </div>
+      <div class="apr-linha">
+        <input type="checkbox" ${apr ? "checked" : ""} ${hom ? "" : "disabled"} onchange="marcarAprovacao('${c.ID}','aprovacao',this.checked)" aria-label="Aprovação do Subprocurador-Geral">
+        <span style="min-width:230px"><b>Aprovação</b> · Subprocurador-Geral (André)</span>
+        <input type="date" id="apr-data-aprovacao-${c.ID}" value="${apr}" ${apr ? "" : "disabled"} onchange="mudarDataAprovacao('${c.ID}','aprovacao')">
+      </div>
+      <div class="etapa-linha">${n === 2 ? "Aprovação completa." : "O caso só segue para \"Em cumprimento\" com as duas marcadas."}</div>
+    </div>`;
+}
+
 const badgeClasse = {
   "Identificado": "badge-identificado",
   "Em analise": "badge-analise",
@@ -1324,7 +1496,8 @@ const badgeClasse = {
   "Instaurado": "badge-habilitado",
   "Oficio expedido a SEFIN": "badge-andamento",
   "Elaboracao de parecer": "badge-andamento",
-  "Aprovacao pela chefia": "badge-andamento"
+  "Aprovacao pela chefia": "badge-andamento",
+  "Em cumprimento": "badge-andamento"
 };
 
 let listaFocoId = null;
@@ -1337,6 +1510,9 @@ function renderBusca() {
 
   let visiveis = casos.filter(c => c.Devedor.toLowerCase().includes(termo));
   if (filtroEixoAndamento) visiveis = visiveis.filter(c => c.Eixo === filtroEixoAndamento);
+  const selEtapa = document.getElementById("filtro-etapa");
+  const filtroEtapa = selEtapa ? selEtapa.value : "";
+  if (filtroEtapa) visiveis = visiveis.filter(c => etapasDoCaso(c).includes(filtroEtapa));
   visiveis = [...visiveis].sort((a, b) => saldoCaso(b) - saldoCaso(a));
 
   if (listaFocoId !== null) {
@@ -1358,9 +1534,15 @@ function renderBusca() {
     row.onclick = () => { casoSelecionado = c.ID; listaFocoId = c.ID; renderBusca(); renderFicha(); };
 
     const corFase = corPorFasePTAC[c.Status];
+    const sufixoAprov = c.Status === "Aprovacao pela chefia" ? ` · ${aprovacoesFeitas(c)}/2` : "";
     const selo = corFase
-      ? `<span class="selo-fase" style="background:${corFase.bg};color:${corFase.texto}">${c.Status}</span>`
-      : `<span class="badge ${badgeClasse[c.Status] || "badge-identificado"}">${c.Status}</span>`;
+      ? `<span class="selo-fase" style="background:${corFase.bg};color:${corFase.texto}">${rotuloStatus(c.Status)}${sufixoAprov}</span>`
+      : `<span class="badge ${badgeClasse[c.Status] || "badge-identificado"}">${rotuloStatus(c.Status)}</span>`;
+    const etapasC = concluido ? [] : etapasDoCaso(c);
+    const diasEtapa = diasDesde(c.DataEntradaEtapa);
+    const linhaEtapa = etapasC.length
+      ? `<div class="etapa-linha">Com: <b>${etapasC.join(" + ")}</b>${diasEtapa !== null ? " · " + textoDias(diasEtapa) : ""}</div>`
+      : "";
 
     const saldoDevedor = saldoCaso(c);
     const nCdas = c.NumeroCDAs || 0;
@@ -1378,6 +1560,7 @@ function renderBusca() {
       <div style="flex:1;min-width:0">
         <div class="lista-nome">${c.Devedor}${c.Documento ? ` <span style="font-weight:400;color:var(--texto-sec);font-size:12px">- ${c.Documento}</span>` : ""} <span style="font-weight:400;color:var(--texto-sec);font-size:12px">· ${hInfo ? hInfo.citacao : "Hipotese nao informada"}</span></div>
         <div style="font-size:13px;font-weight:600;color:var(--verde-escuro);margin-top:3px">${linhaValor}</div>
+        ${linhaEtapa}
       </div>
       <div class="lista-acoes">
         ${selo}
@@ -1464,7 +1647,7 @@ async function renderFicha() {
   const fase = c.Fase || (c.Eixo === "PTAC" ? "PTAC" : "Triagem");
 
   const STATUS_TRIAGEM = ["Identificado", "Pesquisando", "Habilitacao em andamento", "Habilitado", "Encaminhado ao PTAC"];
-  const STATUS_PTAC = ["Instaurado", "Oficio expedido a SEFIN", "Elaboracao de parecer", "Aprovacao pela chefia", "Concluido"];
+  const STATUS_PTAC = ["Instaurado", "Oficio expedido a SEFIN", "Elaboracao de parecer", "Aprovacao pela chefia", "Em cumprimento", "Concluido"];
   const listaStatus = fase === "PTAC" ? STATUS_PTAC : STATUS_TRIAGEM;
   const passoAtual = Math.max(0, listaStatus.indexOf(c.Status));
 
@@ -1473,7 +1656,7 @@ async function renderFicha() {
     const estado = i < passoAtual ? "concluido" : (i === passoAtual ? "ativo" : "");
     tracker += `<div class="status-step">
       <div class="status-circle ${estado}">${i < passoAtual ? "&#10003;" : i+1}</div>
-      <div class="status-nome ${estado}">${nome}</div>
+      <div class="status-nome ${estado}">${rotuloStatus(nome)}</div>
     </div>`;
     if (i < listaStatus.length - 1) {
       const estadoLinha = i < passoAtual ? "concluido" : "";
@@ -1496,9 +1679,10 @@ async function renderFicha() {
       <div class="field">
         <label>Status do caso (${fase === "PTAC" ? "fluxo PTAC" : "triagem"})</label>
         <select id="ficha-status" onchange="atualizarStatusCaso('${c.ID}', this.value)">
-          ${listaStatus.map(s => `<option ${s===c.Status?"selected":""}>${s}</option>`).join("")}
+          ${listaStatus.map(s => `<option value="${s}" ${s===c.Status?"selected":""}>${rotuloStatus(s)}</option>`).join("")}
         </select>
       </div>
+      ${fase === "PTAC" ? blocoEtapaFicha(c) + blocoAprovacaoFicha(c) : ""}
       <div class="field bloco bloco-hipotese">
         <label>Hipotese de incidencia</label>
         <div style="font-size:13.5px;color:var(--texto);margin-bottom:6px">
@@ -2117,9 +2301,18 @@ async function salvarAgregadoManual(casoId) {
 }
 
 async function atualizarStatusCaso(casoId, status) {
+  const c = casos.find(x => String(x.ID) === String(casoId));
+  if (status === "Em cumprimento" && c && aprovacoesFeitas(c) < 2) {
+    const falta = 2 - aprovacoesFeitas(c);
+    if (!confirm("Faltam " + falta + " de 2 aprovações da chefia (homologação do Gabriel e aprovação do André).\n\nMover para \"Em cumprimento\" mesmo assim?")) {
+      renderFicha(); return;
+    }
+  }
   await api("atualizarStatusCaso", { id: casoId, status: status });
   await carregarCasos();
+  await aplicarSugestaoEtapa(casoId);
   renderFicha();
+  renderBusca();
 }
 
 async function confirmarEncaminharPtac(casoId, devedor) {
@@ -2141,6 +2334,7 @@ const corPorFasePTAC = {
   "Oficio expedido a SEFIN": { bg: "#fdeee2", texto: "#b8541f" },
   "Elaboracao de parecer": { bg: "#fdf3d8", texto: "#9a7207" },
   "Aprovacao pela chefia": { bg: "#eef7e0", texto: "#5a8f2e" },
+  "Em cumprimento": { bg: "#e4eefa", texto: "#2b6cb0" },
   "Concluido": { bg: "#e1f5ee", texto: "#076b5e" },
   "Concluido/Extinto": { bg: "#e1f5ee", texto: "#076b5e" }
 };

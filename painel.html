@@ -67,6 +67,7 @@ body { font-family: 'Source Sans 3', sans-serif; background: #e4e8ec; color: var
 .linha-corpo { flex: 1; min-width: 0; }
 .linha-nome { font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
 .linha-nome span { font-weight: 400; color: var(--texto-sec); font-size: 12px; }
+.linha-etapa { font-size: 12.5px; color: var(--texto-sec); margin-top: 3px; }
 .linha-valores { font-size: 13px; font-weight: 600; color: var(--verde-escuro); margin-top: 3px; }
 .linha-lado { display: flex; flex-direction: column; align-items: center; gap: 5px; flex-shrink: 0; min-width: 120px; }
 .selo-fase { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; }
@@ -179,7 +180,8 @@ const FASES = {
   "Instaurado": { r: "Instaurado", bg: "#fdecea", t: "#c0392b" },
   "Oficio expedido a SEFIN": { r: "Ofício expedido à SEFIN", bg: "#fdeee2", t: "#b8541f" },
   "Elaboracao de parecer": { r: "Elaboração de parecer", bg: "#fdf3d8", t: "#9a7207" },
-  "Aprovacao pela chefia": { r: "Aprovação pela chefia", bg: "#eef7e0", t: "#5a8f2e" },
+  "Aprovacao pela chefia": { r: "Aguardando aprovação da chefia", bg: "#eef7e0", t: "#5a8f2e" },
+  "Em cumprimento": { r: "Em cumprimento", bg: "#e4eefa", t: "#2b6cb0" },
   "Concluido": { r: "Concluído", bg: "#e1f5ee", t: "#076b5e" },
   "Concluido/Extinto": { r: "Concluído", bg: "#e1f5ee", t: "#076b5e" }
 };
@@ -213,10 +215,23 @@ function citacao(valor) {
   const m = String(valor || "").match(/^\s*(I{1,3}|IV|V|VI)\b/);
   return m ? "Art. 5º, §1º, " + m[1] + " Portaria 53/2026-GPG" : null;
 }
-function selo(status) {
+function selo(status, d) {
   const f = FASES[status];
   if (!f) return `<span class="selo-fase" style="background:#eceff1;color:#5a6472">${esc(status || "—")}</span>`;
-  return `<span class="selo-fase" style="background:${f.bg};color:${f.t}">${f.r}</span>`;
+  const feitas = d ? (d.homologacao ? 1 : 0) + (d.aprovacao ? 1 : 0) : 0;
+  const sufixo = status === "Aprovacao pela chefia" ? ` · ${feitas}/2` : "";
+  return `<span class="selo-fase" style="background:${f.bg};color:${f.t}">${f.r}${sufixo}</span>`;
+}
+function diasDesdeIso(iso) {
+  const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  return Math.max(0, Math.floor((Date.now() - new Date(+m[1], +m[2] - 1, +m[3]).getTime()) / 86400000));
+}
+function linhaEtapa(d) {
+  if (concluidoStatus(d.status) || !d.etapa) return "";
+  const n = diasDesdeIso(d.dataEtapa);
+  const tempo = n === null ? "" : " · " + (n === 0 ? "hoje" : n === 1 ? "há 1 dia" : "há " + n + " dias");
+  return `<div class="linha-etapa">Com: <b>${esc(d.etapa)}</b>${tempo}</div>`;
 }
 const concluidoStatus = s => s === "Concluido" || s === "Concluido/Extinto";
 
@@ -292,7 +307,8 @@ const GRUPOS_FASE = [ /* mesmos nomes de fase da lista de Contribuintes / Andame
   { rot: "Instaurado", cor: "#d64545", st: ["Instaurado"] },
   { rot: "Ofício expedido à SEFIN", cor: "#e8892b", st: ["Oficio expedido a SEFIN"] },
   { rot: "Elaboração de parecer", cor: "#e3b505", st: ["Elaboracao de parecer"] },
-  { rot: "Aprovação pela chefia", cor: "#6aa84f", st: ["Aprovacao pela chefia"] },
+  { rot: "Aguardando aprovação da chefia", cor: "#6aa84f", st: ["Aprovacao pela chefia"] },
+  { rot: "Em cumprimento", cor: "#3b82c4", st: ["Em cumprimento"] },
   { rot: "Concluído", cor: "#0a8a7a", st: ["Concluido", "Concluido/Extinto"] }
 ];
 const COR_OUTROS = "#7e57c2";
@@ -488,8 +504,9 @@ function linhaHtml(d) {
     <div class="linha-corpo">
       <div class="linha-nome">${esc(d.devedor)} <span>${d.documento ? "- " + esc(d.documento) : ""} · ${h ? esc(h) : "Hipótese não informada"}</span></div>
       <div class="linha-valores">${fmt(d.saldo)} · ${plural(Number(d.execucoes) || 0, "execução", "execuções")} · ${plural(Number(d.cdas) || 0, "CDA", "CDAs")}</div>
+      ${linhaEtapa(d)}
     </div>
-    <div class="linha-lado">${selo(d.status)}${botao}</div>
+    <div class="linha-lado">${selo(d.status, d)}${botao}</div>
   </div>`;
 }
 
