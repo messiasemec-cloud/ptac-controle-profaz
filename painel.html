@@ -67,7 +67,6 @@ body { font-family: 'Source Sans 3', sans-serif; background: #e4e8ec; color: var
 .linha-corpo { flex: 1; min-width: 0; }
 .linha-nome { font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
 .linha-nome span { font-weight: 400; color: var(--texto-sec); font-size: 12px; }
-.linha-etapa { font-size: 12.5px; color: var(--texto-sec); margin-top: 3px; }
 .linha-valores { font-size: 13px; font-weight: 600; color: var(--verde-escuro); margin-top: 3px; }
 .linha-lado { display: flex; flex-direction: column; align-items: center; gap: 5px; flex-shrink: 0; min-width: 120px; }
 .selo-fase { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; }
@@ -221,17 +220,6 @@ function selo(status, d) {
   const feitas = d ? (d.homologacao ? 1 : 0) + (d.aprovacao ? 1 : 0) : 0;
   const sufixo = status === "Aprovacao pela chefia" ? ` · ${feitas}/2` : "";
   return `<span class="selo-fase" style="background:${f.bg};color:${f.t}">${f.r}${sufixo}</span>`;
-}
-function diasDesdeIso(iso) {
-  const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!m) return null;
-  return Math.max(0, Math.floor((Date.now() - new Date(+m[1], +m[2] - 1, +m[3]).getTime()) / 86400000));
-}
-function linhaEtapa(d) {
-  if (concluidoStatus(d.status) || !d.etapa) return "";
-  const n = diasDesdeIso(d.dataEtapa);
-  const tempo = n === null ? "" : " · " + (n === 0 ? "hoje" : n === 1 ? "há 1 dia" : "há " + n + " dias");
-  return `<div class="linha-etapa">Com: <b>${esc(d.etapa)}</b>${tempo}</div>`;
 }
 const concluidoStatus = s => s === "Concluido" || s === "Concluido/Extinto";
 
@@ -504,7 +492,6 @@ function linhaHtml(d) {
     <div class="linha-corpo">
       <div class="linha-nome">${esc(d.devedor)} <span>${d.documento ? "- " + esc(d.documento) : ""} · ${h ? esc(h) : "Hipótese não informada"}</span></div>
       <div class="linha-valores">${fmt(d.saldo)} · ${plural(Number(d.execucoes) || 0, "execução", "execuções")} · ${plural(Number(d.cdas) || 0, "CDA", "CDAs")}</div>
-      ${linhaEtapa(d)}
     </div>
     <div class="linha-lado">${selo(d.status, d)}${botao}</div>
   </div>`;

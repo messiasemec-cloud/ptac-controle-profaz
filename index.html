@@ -162,13 +162,14 @@ select:focus { border-color: var(--verde); }
 .prog-row:last-child { border-bottom: none; }
 .prog-row.concluido { border-left-color: var(--verde); background: #f1f9f6; }
 .selo-fase { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; }
-.chip-etapa { display:inline-flex; align-items:center; gap:6px; padding:5px 11px; margin:0 6px 6px 0; border:1.5px solid var(--cinza-borda); border-radius:20px; font-size:13px; cursor:pointer; background:var(--branco); }
-.chip-etapa input { width:auto; margin:0; }
-.chip-etapa.on { border-color:var(--verde); background:#e1f5ee; color:#076b5e; font-weight:600; }
 .apr-linha { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 0; border-bottom:1px solid var(--cinza-borda); }
 .apr-linha:last-child { border-bottom:none; }
 .apr-linha input[type="checkbox"] { width:18px; height:18px; }
 .apr-linha input[type="date"] { width:auto; padding:6px 10px; border:1.5px solid var(--cinza-borda); border-radius:8px; font-family:inherit; font-size:14px; }
+.abas-eixo { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+.aba-eixo { padding:7px 14px; border:1.5px solid var(--cinza-borda); border-radius:20px; background:var(--branco); font-family:inherit; font-size:13.5px; font-weight:600; color:var(--texto-sec); cursor:pointer; }
+.aba-eixo .qtd { font-weight:500; margin-left:4px; opacity:.8; }
+.aba-eixo.ativa { border-color:var(--verde); background:#e1f5ee; color:#076b5e; }
 .etapa-linha { font-size:12.5px; color:var(--texto-sec); margin-top:3px; }
 .prog-topo { display: flex; justify-content: space-between; margin-bottom: 8px; }
 .bbg { width: 100%; height: 6px; border-radius: 3px; background: var(--cinza-borda); overflow: hidden; }
@@ -319,16 +320,8 @@ select:focus { border-color: var(--verde); }
       <div class="form-card">
         <div class="form-title">Buscar devedor</div>
         <div class="form-sub">Digite o nome para localizar o caso</div>
+        <div class="abas-eixo" id="abas-eixo" role="tablist" aria-label="Filtrar por eixo"></div>
         <input type="text" id="busca-devedor" placeholder="Ex: Orgal, Panorama..." oninput="listaFocoId=null; renderBusca()">
-        <select id="filtro-etapa" onchange="listaFocoId=null; renderBusca()" style="margin-top:8px" aria-label="Filtrar por quem está com o caso">
-          <option value="">Com quem está: todos</option>
-          <option value="Dr. Neto">Com o Dr. Neto</option>
-          <option value="Gabriel">Com o Gabriel</option>
-          <option value="André">Com o André</option>
-          <option value="CEDAT">Com a CEDAT</option>
-          <option value="SEFIN">Com a SEFIN</option>
-          <option value="Procurador da execução fiscal">Com o procurador da execução fiscal</option>
-        </select>
         <div id="lista-busca" style="margin-top:12px"></div>
       </div>
       <div id="ficha-caso"></div>
@@ -1332,8 +1325,6 @@ async function sairEdicaoValor(el, bemId) {
 const ROTULO_STATUS = { "Aprovacao pela chefia": "Aguardando aprovacao da chefia" };
 function rotuloStatus(s) { return ROTULO_STATUS[s] || s; }
 
-const ETAPAS = ["Dr. Neto", "Gabriel", "André", "CEDAT", "SEFIN", "Procurador da execução fiscal"];
-
 function dataLocal(iso) {
   const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
@@ -1347,59 +1338,7 @@ function diasDesde(iso) {
   const d = dataLocal(iso);
   return d ? Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000)) : null;
 }
-function textoDias(n) { return n === null ? "" : (n === 0 ? "hoje" : (n === 1 ? "há 1 dia" : "há " + n + " dias")); }
-
-function etapasDoCaso(c) { return String(c.EtapaAtual || "").split(" + ").map(x => x.trim()).filter(Boolean); }
 function aprovacoesFeitas(c) { return (c.DataHomologacaoGabriel ? 1 : 0) + (c.DataAprovacaoAndre ? 1 : 0); }
-
-// Sugestao automatica (sempre editavel pela equipe):
-function sugerirEtapas(c) {
-  switch (c.Status) {
-    case "Instaurado": return ["Dr. Neto"];
-    case "Oficio expedido a SEFIN": return ["SEFIN"];
-    case "Elaboracao de parecer": return ["Dr. Neto"];
-    case "Aprovacao pela chefia":
-      if (!c.DataHomologacaoGabriel) return ["Gabriel"];
-      if (!c.DataAprovacaoAndre) return ["André"];
-      return ["SEFIN", "Dr. Neto"];
-    case "Em cumprimento": return ["SEFIN", "Dr. Neto"];
-    default: return [];
-  }
-}
-
-function quemRegistra() { try { return localStorage.getItem("ptac_quem") || ""; } catch (e) { return ""; } }
-function definirQuemRegistra(v) { try { localStorage.setItem("ptac_quem", v); } catch (e) {} }
-
-async function aplicarSugestaoEtapa(id) {
-  const c = casos.find(x => String(x.ID) === String(id));
-  if (!c || (c.Fase || (c.Eixo === "PTAC" ? "PTAC" : "Triagem")) !== "PTAC") return;
-  const sug = sugerirEtapas(c).join(" + ");
-  if (sug === (c.EtapaAtual || "")) return;
-  await api("atualizarMarcoCaso", { id: id, campo: "etapa", valor: sug, data: sug ? hojeIso() : "", quem: quemRegistra() });
-  await carregarCasos();
-}
-
-async function salvarEtapas(id, soData) {
-  const c = casos.find(x => String(x.ID) === String(id));
-  const marcadas = [...document.querySelectorAll(`input[name="etapa-${id}"]:checked`)].map(i => i.value);
-  const antes = etapasDoCaso(c);
-  const entrouNova = marcadas.some(e => !antes.includes(e));
-  const campoData = document.getElementById("etapa-data-" + id);
-  let data = campoData && campoData.value ? campoData.value : hojeIso();
-  if (entrouNova && !soData) data = hojeIso();
-  if (!marcadas.length) data = "";
-  await api("atualizarMarcoCaso", { id: id, campo: "etapa", valor: marcadas.join(" + "), data: data, quem: quemRegistra() });
-  await carregarCasos();
-  renderFicha(); renderBusca();
-}
-
-async function usarSugestaoEtapa(id) {
-  const c = casos.find(x => String(x.ID) === String(id));
-  const sug = sugerirEtapas(c).join(" + ");
-  await api("atualizarMarcoCaso", { id: id, campo: "etapa", valor: sug, data: sug ? hojeIso() : "", quem: quemRegistra() });
-  await carregarCasos();
-  renderFicha(); renderBusca();
-}
 
 async function marcarAprovacao(id, tipo, marcado) {
   const c = casos.find(x => String(x.ID) === String(id));
@@ -1417,9 +1356,8 @@ async function marcarAprovacao(id, tipo, marcado) {
   }
   const campoData = document.getElementById("apr-data-" + tipo + "-" + id);
   const data = marcado ? ((campoData && campoData.value) || hojeIso()) : "";
-  await api("atualizarMarcoCaso", { id: id, campo: tipo, data: data, quem: quemRegistra() });
+  await api("atualizarMarcoCaso", { id: id, campo: tipo, data: data });
   await carregarCasos();
-  await aplicarSugestaoEtapa(id);
   const c2 = casos.find(x => String(x.ID) === String(id));
   if (marcado && aprovacoesFeitas(c2) === 2 && c2.Status === "Aprovacao pela chefia") {
     if (confirm("As duas aprovações foram registradas.\n\nMover o caso para \"Em cumprimento\"?")) {
@@ -1433,32 +1371,9 @@ async function marcarAprovacao(id, tipo, marcado) {
 async function mudarDataAprovacao(id, tipo) {
   const campoData = document.getElementById("apr-data-" + tipo + "-" + id);
   if (!campoData || !campoData.value) return;
-  await api("atualizarMarcoCaso", { id: id, campo: tipo, data: campoData.value, quem: quemRegistra() });
+  await api("atualizarMarcoCaso", { id: id, campo: tipo, data: campoData.value });
   await carregarCasos();
   renderFicha();
-}
-
-function blocoEtapaFicha(c) {
-  const sel = etapasDoCaso(c);
-  const sug = sugerirEtapas(c);
-  const dias = diasDesde(c.DataEntradaEtapa);
-  const chips = ETAPAS.map(e => `<label class="chip-etapa ${sel.includes(e) ? "on" : ""}"><input type="checkbox" name="etapa-${c.ID}" value="${e}" ${sel.includes(e) ? "checked" : ""} onchange="salvarEtapas('${c.ID}')"> ${e}</label>`).join("");
-  const sugTxt = sug.length ? sug.join(" + ") : "nenhuma";
-  const igual = sug.join(" + ") === sel.join(" + ");
-  return `
-    <div class="field bloco">
-      <label>Com quem está</label>
-      <div>${chips}</div>
-      ${sel.length ? `<div class="etapa-linha">Desde <input type="date" id="etapa-data-${c.ID}" value="${c.DataEntradaEtapa || ""}" onchange="salvarEtapas('${c.ID}', true)" style="width:auto;padding:4px 8px;font-size:13px;display:inline-block"> ${dias !== null ? "· " + textoDias(dias) : ""}</div>` : `<div class="etapa-linha">Nenhuma etapa registrada.</div>`}
-      ${igual ? "" : `<div class="etapa-linha">Sugestão pelo status: <b>${sugTxt}</b> · <a href="#" style="color:var(--verde);text-decoration:underline" onclick="usarSugestaoEtapa('${c.ID}'); return false;">usar sugestão</a></div>`}
-      <div class="etapa-linha" style="margin-top:8px">Registrando como:
-        <select style="width:auto;padding:3px 8px;font-size:13px;display:inline-block" onchange="definirQuemRegistra(this.value)">
-          <option value="" ${!quemRegistra() ? "selected" : ""}>(não informar)</option>
-          <option value="Dr. Neto" ${quemRegistra() === "Dr. Neto" ? "selected" : ""}>Dr. Neto</option>
-          <option value="Letícia" ${quemRegistra() === "Letícia" ? "selected" : ""}>Letícia</option>
-        </select>
-      </div>
-    </div>`;
 }
 
 function blocoAprovacaoFicha(c) {
@@ -1478,7 +1393,7 @@ function blocoAprovacaoFicha(c) {
         <span style="min-width:230px"><b>Aprovação</b> · Subprocurador-Geral (André)</span>
         <input type="date" id="apr-data-aprovacao-${c.ID}" value="${apr}" ${apr ? "" : "disabled"} onchange="mudarDataAprovacao('${c.ID}','aprovacao')">
       </div>
-      <div class="etapa-linha">${n === 2 ? "Aprovação completa." : "O caso só segue para \"Em cumprimento\" com as duas marcadas."}</div>
+      <div class="etapa-linha">${n === 2 ? "Aprovação completa." : (n === 0 ? "Aguardando a homologação do Gabriel." : "Aguardando a aprovação do André.")} O caso só segue para "Em cumprimento" com as duas marcadas.</div>
     </div>`;
 }
 
@@ -1503,16 +1418,43 @@ const badgeClasse = {
 let listaFocoId = null;
 let filtroEixoAndamento = "";
 
+// Eixo normalizado ("ptac" | "falencia" | "inventario"), tolerante a acento/maiuscula
+function eixoChave(c) {
+  const e = String(c.Eixo || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (e.includes("falenc")) return "falencia";
+  if (e.includes("invent") || e.includes("espol")) return "inventario";
+  if (e.includes("ptac")) return "ptac";
+  return e;
+}
+const ABAS_EIXO = [
+  { chave: "", rotulo: "Todos" },
+  { chave: "ptac", rotulo: "PTAC" },
+  { chave: "falencia", rotulo: "Falência" },
+  { chave: "inventario", rotulo: "Inventário" }
+];
+function escolherAbaEixo(chave) {
+  filtroEixoAndamento = chave;
+  listaFocoId = null;
+  renderBusca();
+}
+function renderAbasEixo() {
+  const alvo = document.getElementById("abas-eixo");
+  if (!alvo) return;
+  alvo.innerHTML = ABAS_EIXO.map(a => {
+    const n = a.chave ? casos.filter(c => eixoChave(c) === a.chave).length : casos.length;
+    const ativa = filtroEixoAndamento === a.chave;
+    return `<button type="button" class="aba-eixo${ativa ? " ativa" : ""}" role="tab" aria-selected="${ativa}" onclick="escolherAbaEixo('${a.chave}')">${a.rotulo}<span class="qtd">${n}</span></button>`;
+  }).join("");
+}
+
 function renderBusca() {
   const termo = (document.getElementById("busca-devedor").value || "").toLowerCase();
   const lista = document.getElementById("lista-busca");
   lista.innerHTML = "";
 
   let visiveis = casos.filter(c => c.Devedor.toLowerCase().includes(termo));
-  if (filtroEixoAndamento) visiveis = visiveis.filter(c => c.Eixo === filtroEixoAndamento);
-  const selEtapa = document.getElementById("filtro-etapa");
-  const filtroEtapa = selEtapa ? selEtapa.value : "";
-  if (filtroEtapa) visiveis = visiveis.filter(c => etapasDoCaso(c).includes(filtroEtapa));
+  renderAbasEixo();
+  if (filtroEixoAndamento) visiveis = visiveis.filter(c => eixoChave(c) === filtroEixoAndamento);
   visiveis = [...visiveis].sort((a, b) => saldoCaso(b) - saldoCaso(a));
 
   if (listaFocoId !== null) {
@@ -1538,11 +1480,6 @@ function renderBusca() {
     const selo = corFase
       ? `<span class="selo-fase" style="background:${corFase.bg};color:${corFase.texto}">${rotuloStatus(c.Status)}${sufixoAprov}</span>`
       : `<span class="badge ${badgeClasse[c.Status] || "badge-identificado"}">${rotuloStatus(c.Status)}</span>`;
-    const etapasC = concluido ? [] : etapasDoCaso(c);
-    const diasEtapa = diasDesde(c.DataEntradaEtapa);
-    const linhaEtapa = etapasC.length
-      ? `<div class="etapa-linha">Com: <b>${etapasC.join(" + ")}</b>${diasEtapa !== null ? " · " + textoDias(diasEtapa) : ""}</div>`
-      : "";
 
     const saldoDevedor = saldoCaso(c);
     const nCdas = c.NumeroCDAs || 0;
@@ -1560,7 +1497,6 @@ function renderBusca() {
       <div style="flex:1;min-width:0">
         <div class="lista-nome">${c.Devedor}${c.Documento ? ` <span style="font-weight:400;color:var(--texto-sec);font-size:12px">- ${c.Documento}</span>` : ""} <span style="font-weight:400;color:var(--texto-sec);font-size:12px">· ${hInfo ? hInfo.citacao : "Hipotese nao informada"}</span></div>
         <div style="font-size:13px;font-weight:600;color:var(--verde-escuro);margin-top:3px">${linhaValor}</div>
-        ${linhaEtapa}
       </div>
       <div class="lista-acoes">
         ${selo}
@@ -1682,7 +1618,7 @@ async function renderFicha() {
           ${listaStatus.map(s => `<option value="${s}" ${s===c.Status?"selected":""}>${rotuloStatus(s)}</option>`).join("")}
         </select>
       </div>
-      ${fase === "PTAC" ? blocoEtapaFicha(c) + blocoAprovacaoFicha(c) : ""}
+      ${fase === "PTAC" ? blocoAprovacaoFicha(c) : ""}
       <div class="field bloco bloco-hipotese">
         <label>Hipotese de incidencia</label>
         <div style="font-size:13.5px;color:var(--texto);margin-bottom:6px">
@@ -2310,7 +2246,6 @@ async function atualizarStatusCaso(casoId, status) {
   }
   await api("atualizarStatusCaso", { id: casoId, status: status });
   await carregarCasos();
-  await aplicarSugestaoEtapa(casoId);
   renderFicha();
   renderBusca();
 }
