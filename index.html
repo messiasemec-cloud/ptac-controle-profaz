@@ -2023,8 +2023,12 @@ function processarUploadCDAs(event, casoId) {
         const tipoReceita = String(r[1] || "").trim();
         const processo = String(r[3] || "").trim();
         const status = String(r[18] || "").trim();
+        const faseCda = String(r[4] || "").trim().toUpperCase();
+        // O Agilis nao conta como ativa a CDA cuja Fase ja e de extincao (EXTINTO, QUITADO, CANCELADO, REMIDO, PRESCRITO),
+        // mesmo quando a coluna Status ainda traz "Ativo".
+        const faseExtinta = ["EXTINTO", "QUITADO", "CANCELADO", "REMIDO", "PRESCRITO"].includes(faseCda);
         if (!cdaInfo[numCda]) cdaInfo[numCda] = { ativa: false, tributo: "", ajuizada: false, saldo: 0 };
-        if (status === "Ativo") {
+        if (status === "Ativo" && !faseExtinta) {
           cdaInfo[numCda].ativa = true;
           cdaInfo[numCda].tributo = tipoReceita.split(" - ")[0].trim() || "Outros";
           cdaInfo[numCda].ajuizada = !!processo;
