@@ -61,7 +61,26 @@ body { font-family: 'Source Sans 3', sans-serif; background: #e4e8ec; color: var
 .grupo { padding: .5rem .75rem; margin-bottom: 0; }
 
 .linha { display: flex; align-items: center; gap: 12px; padding: 12px 10px; border-bottom: 1px solid var(--cinza-borda); border-radius: 6px; border-left: 3px solid transparent; }
-.linha:last-child { border-bottom: none; }
+.item:last-child > .linha { border-bottom: none; }
+.item > .linha { cursor: pointer; }
+.item > .linha:hover { background: #f7f9fa; }
+.item > .linha.concluido:hover { background: #e9f5f0; }
+.seta { color: var(--texto-sec); font-size: 12px; margin-left: 6px; display: inline-block; transition: transform .15s; }
+.item.aberto .seta { transform: rotate(180deg); }
+.detalhe { padding: 4px 12px 16px 58px; border-bottom: 1px solid var(--cinza-borda); background: #fbfcfc; }
+.item:last-child > .detalhe { border-bottom: none; }
+.fases { display: flex; align-items: flex-start; margin: 12px 0 8px; }
+.fase { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; }
+.fase-bola { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--cinza-borda); background: var(--branco); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--texto-sec); }
+.fase-bola.feito { border-color: var(--verde); background: var(--verde); color: #fff; }
+.fase-bola.atual { border-color: var(--azul); background: var(--azul); color: #fff; }
+.fase-nome { font-size: 11px; color: var(--texto-sec); margin-top: 6px; text-align: center; line-height: 1.25; padding: 0 2px; }
+.fase-nome.feito { color: var(--verde-escuro); font-weight: 600; }
+.fase-nome.atual { color: #1d7fb0; font-weight: 700; }
+.fase-ligacao { flex: 1; height: 2px; background: var(--cinza-borda); margin: 12px 2px 0; min-width: 6px; }
+.fase-ligacao.feito { background: var(--verde); }
+.fase-datas { font-size: 12px; color: var(--texto-sec); }
+@media (max-width: 700px) { .detalhe { padding: 4px 8px 14px; } .fase-nome { font-size: 10px; } }
 .linha.concluido { background: #f1f9f6; border-left-color: var(--verde); }
 .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--verde); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
 .linha-corpo { flex: 1; min-width: 0; }
@@ -455,6 +474,7 @@ function renderContribuintes() {
   const campo = document.getElementById("busca");
   campo.addEventListener("input", () => { busca = campo.value; renderListaMeses(); });
   document.getElementById("lista-meses").addEventListener("click", cliqueLista);
+  document.getElementById("lista-meses").addEventListener("keydown", tecladoLista);
   renderListaMeses();
 }
 
@@ -481,28 +501,86 @@ function renderListaMeses() {
   }).join("");
 }
 
+const ETAPAS_PTAC = ["Instaurado", "Oficio expedido a SEFIN", "Elaboracao de parecer", "Aprovacao pela chefia", "Em cumprimento", "Concluido"];
+const abertos = new Set();
+
+function dataIsoBR(iso) {
+  const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? m[3] + "/" + m[2] + "/" + m[1] : "";
+}
+
+function barraFasesHtml(d) {
+  const status = d.status === "Concluido/Extinto" ? "Concluido" : d.status;
+  const idx = ETAPAS_PTAC.indexOf(status);
+  if (idx < 0) return `<div class="fase-datas">Fase atual: ${esc(status || "—")}</div>`;
+  const encerrado = status === "Concluido";
+  const feitas = (d.homologacao ? 1 : 0) + (d.aprovacao ? 1 : 0);
+  let h = '<div class="fases">';
+  ETAPAS_PTAC.forEach((et, i) => {
+    const est = (i < idx || (encerrado && i === idx)) ? "feito" : (i === idx ? "atual" : "");
+    const rot = (FASES[et] || { r: et }).r + (et === "Aprovacao pela chefia" && i === idx ? ` (${feitas}/2)` : "");
+    h += `<div class="fase"><div class="fase-bola ${est}">${est === "feito" ? "&#10003;" : i + 1}</div><div class="fase-nome ${est}">${esc(rot)}</div></div>`;
+    if (i < ETAPAS_PTAC.length - 1) h += `<div class="fase-ligacao ${i < idx ? "feito" : ""}"></div>`;
+  });
+  h += "</div>";
+  const datas = [];
+  if (d.dataInstauracao) datas.push("Instaurado em " + dataIsoBR(d.dataInstauracao));
+  if (d.homologacao) datas.push("Homologação da chefia em " + dataIsoBR(d.homologacao));
+  if (d.aprovacao) datas.push("Aprovação final em " + dataIsoBR(d.aprovacao));
+  return h + (datas.length ? `<div class="fase-datas">${datas.map(esc).join(" · ")}</div>` : "");
+}
+
 function linhaHtml(d) {
   const h = citacao(d.hipotese);
   const n = d.pareceres.length;
   const botao = n
     ? `<button class="btn-parecer" data-caso="${esc(d.casoId)}" title="${n > 1 ? "Clique aqui para visualizar os pareceres" : "Clique aqui para visualizar o parecer"}" aria-label="Visualizar parecer de ${esc(d.devedor)}">${ICONE_DOC}${n > 1 ? `<span class="qtd">${n}</span>` : ""}</button>`
     : "";
-  return `<div class="linha${concluidoStatus(d.status) ? " concluido" : ""}">
+  const aberto = abertos.has(String(d.casoId));
+  return `<div class="item${aberto ? " aberto" : ""}" data-caso="${esc(d.casoId)}">
+  <div class="linha${concluidoStatus(d.status) ? " concluido" : ""}" role="button" tabindex="0" aria-expanded="${aberto}" title="Clique para ver as fases">
     <div class="avatar">${esc(iniciais(d.devedor))}</div>
     <div class="linha-corpo">
       <div class="linha-nome">${esc(d.devedor)} <span>${d.documento ? "- " + esc(d.documento) : ""} · ${h ? esc(h) : "Hipótese não informada"}</span></div>
       <div class="linha-valores">${fmt(d.saldo)} · ${plural(Number(d.execucoes) || 0, "execução", "execuções")} · ${plural(Number(d.cdas) || 0, "CDA", "CDAs")}</div>
     </div>
-    <div class="linha-lado">${selo(d.status, d)}${botao}</div>
+    <div class="linha-lado">${selo(d.status, d)}${botao}<span class="seta" aria-hidden="true">&#9660;</span></div>
+  </div>
+  ${aberto ? `<div class="detalhe">${barraFasesHtml(d)}</div>` : ""}
   </div>`;
 }
 
 /* ---------------- Visualizar parecer ---------------- */
 function cliqueLista(ev) {
   const botao = ev.target.closest(".btn-parecer");
-  if (!botao) return;
-  const d = devedores.find(x => String(x.casoId) === botao.dataset.caso);
-  if (d && d.pareceres.length) abrirVisualizador({ devedor: d.devedor, pareceres: d.pareceres });
+  if (botao) {
+    const d = devedores.find(x => String(x.casoId) === botao.dataset.caso);
+    if (d && d.pareceres.length) abrirVisualizador({ devedor: d.devedor, pareceres: d.pareceres });
+    return;
+  }
+  const linha = ev.target.closest(".item > .linha");
+  if (!linha) return;
+  alternarFases(linha.parentElement);
+}
+function alternarFases(item) {
+  const id = String(item.dataset.caso);
+  const d = devedores.find(x => String(x.casoId) === id);
+  if (!d) return;
+  const abrir = !abertos.has(id);
+  if (abrir) abertos.add(id); else abertos.delete(id);
+  item.classList.toggle("aberto", abrir);
+  item.querySelector(".linha").setAttribute("aria-expanded", String(abrir));
+  const atual = item.querySelector(".detalhe");
+  if (atual) atual.remove();
+  if (abrir) item.insertAdjacentHTML("beforeend", `<div class="detalhe">${barraFasesHtml(d)}</div>`);
+}
+function tecladoLista(ev) {
+  if (ev.key !== "Enter" && ev.key !== " ") return;
+  if (ev.target.closest(".btn-parecer")) return;
+  const linha = ev.target.closest(".item > .linha");
+  if (!linha) return;
+  ev.preventDefault();
+  alternarFases(linha.parentElement);
 }
 
 /* VIZ-JS-INICIO */
