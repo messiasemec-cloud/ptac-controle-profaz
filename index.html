@@ -118,6 +118,8 @@ select:focus { border-color: var(--verde); }
 
 /* FICHA DO DEVEDOR */
 .ficha-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 1.25rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--cinza-borda); }
+.aviso-retomada { background:#eceff1; color:#3f4a57; border-radius:8px; padding:10px 14px; font-size:13px; margin:0 0 14px; }
+.nota-campo { font-size: 12px; color: var(--texto-sec); margin-top: 4px; line-height: 1.4; }
 .ficha-nome { font-size: 16px; font-weight: 600; color: var(--texto); }
 .ficha-sub { font-size: 13px; color: var(--texto-sec); margin-top: 4px; }
 
@@ -276,7 +278,7 @@ select:focus { border-color: var(--verde); }
           </button>
         </div>
 
-        <div class="field"><label>Devedor</label><input type="text" id="f-devedor" placeholder="Nome do devedor"></div>
+        <div class="field"><label>Devedor</label><input type="text" id="f-devedor" placeholder="Nome do devedor" style="text-transform:uppercase"></div>
 
         <div class="field-row">
           <div><label>CPF ou CNPJ</label><input type="text" id="f-doc" placeholder="000.000.000-00"></div>
@@ -289,7 +291,8 @@ select:focus { border-color: var(--verde); }
         </div>
 
         <div class="field-row">
-          <div><label>No processo referencia</label><input type="text" id="f-processo" placeholder="0000000-00.2026.8.06.0001"></div>
+          <div><label>No processo referencia</label><input type="text" id="f-processo" placeholder="0000000-00.2026.8.06.0001">
+            <div class="nota-campo">Informe o número da execução fiscal ou do processo administrativo (PA) pelo qual este caso é acompanhado.</div></div>
           <div><label>Saldo devedor (R$)</label><input type="number" id="f-saldo" placeholder="0"></div>
         </div>
 
@@ -1351,7 +1354,7 @@ async function sairEdicaoValor(el, bemId) {
 
 // ---- Fluxo PTAC: rotulos, etapas ("com quem esta") e aprovacao 1/2 ----
 // O valor guardado na planilha continua "Aprovacao pela chefia"; so o texto exibido muda.
-const ROTULO_STATUS = { "Aprovacao pela chefia": "Aguardando aprovacao da chefia" };
+const ROTULO_STATUS = { "Aprovacao pela chefia": "Aguardando aprovacao da chefia", "Execucao retomada": "Execução retomada" };
 function rotuloStatus(s) { return ROTULO_STATUS[s] || s; }
 
 function dataLocal(iso) {
@@ -1441,7 +1444,8 @@ const badgeClasse = {
   "Oficio expedido a SEFIN": "badge-andamento",
   "Elaboracao de parecer": "badge-andamento",
   "Aprovacao pela chefia": "badge-andamento",
-  "Em cumprimento": "badge-andamento"
+  "Em cumprimento": "badge-andamento",
+  "Execucao retomada": "badge-suspensa"
 };
 
 let listaFocoId = null;
@@ -1614,7 +1618,10 @@ async function renderFicha() {
   const STATUS_TRIAGEM = ["Identificado", "Pesquisando", "Habilitacao em andamento", "Habilitado", "Encaminhado ao PTAC"];
   const STATUS_PTAC = ["Instaurado", "Oficio expedido a SEFIN", "Elaboracao de parecer", "Aprovacao pela chefia", "Em cumprimento", "Concluido"];
   const listaStatus = fase === "PTAC" ? STATUS_PTAC : STATUS_TRIAGEM;
-  const passoAtual = Math.max(0, listaStatus.indexOf(c.Status));
+  const retomada = c.Status === "Execucao retomada";
+  // Execucao retomada e um desfecho fora das 6 etapas: so aparece no seletor, e a barra fica toda apagada.
+  const opcoesStatus = fase === "PTAC" ? STATUS_PTAC.concat(["Execucao retomada"]) : STATUS_TRIAGEM;
+  const passoAtual = retomada ? -1 : Math.max(0, listaStatus.indexOf(c.Status));
 
   let tracker = '<div class="status-tracker">';
   listaStatus.forEach((nome, i) => {
@@ -1641,10 +1648,11 @@ async function renderFicha() {
         </div>
       </div>
       ${tracker}
+      ${retomada ? `<div class="aviso-retomada"><b>Execução retomada.</b> ${c.MotivoExecucaoRetomada ? "Motivo: " + escHtml(c.MotivoExecucaoRetomada) + "." : "Sem motivo registrado."}${c.DataExecucaoRetomada ? " Registrado em " + fmtIso(c.DataExecucaoRetomada) + "." : ""} O caso não conta mais nos indicadores do PTAC.</div>` : ""}
       <div class="field">
         <label>Status do caso (${fase === "PTAC" ? "fluxo PTAC" : "triagem"})</label>
         <select id="ficha-status" onchange="atualizarStatusCaso('${c.ID}', this.value)">
-          ${listaStatus.map(s => `<option value="${s}" ${s===c.Status?"selected":""}>${rotuloStatus(s)}</option>`).join("")}
+          ${opcoesStatus.map(s => `<option value="${s}" ${s===c.Status?"selected":""}>${rotuloStatus(s)}</option>`).join("")}
         </select>
       </div>
       <div class="field">
@@ -1656,6 +1664,19 @@ async function renderFicha() {
         </select>
       </div>
       ${fase === "PTAC" ? blocoAprovacaoFicha(c) : ""}
+      <div class="field">
+        <label>Processo de referência</label>
+        <input type="text" id="ficha-processo-${c.ID}" value="${escHtml(c.ProcessoReferencia || "")}" placeholder="0000000-00.2026.8.06.0001">
+        <div class="nota-campo">Informe o número da execução fiscal ou do processo administrativo (PA) pelo qual este caso é acompanhado.</div>
+      </div>
+      <div class="field">
+        <label>Observações</label>
+        <textarea id="ficha-obs-${c.ID}" maxlength="1500" rows="3">${escHtml(c.Observacoes || "")}</textarea>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
+          <button type="button" class="btn-submit" style="width:auto;padding:7px 16px" onclick="salvarDadosCaso('${c.ID}')">Salvar processo e observações</button>
+          <span id="ficha-dados-msg-${c.ID}" style="font-size:13px;color:var(--texto-sec)"></span>
+        </div>
+      </div>
       <div class="field bloco bloco-hipotese">
         <label>Hipotese de incidencia</label>
         <div style="font-size:13.5px;color:var(--texto);margin-bottom:6px">
@@ -1710,8 +1731,9 @@ async function renderFicha() {
           <div id="parecer-msg-${c.ID}" style="margin-top:8px;font-size:13px;color:var(--texto-sec)"></div>
         </div>
       </div>
-      ${c.Eixo === "Inventario" ? blocoInventarioFicha(c) : ""}
     </div>`;
+  // Bloco de pesquisa de inventario (blocoInventarioFicha) escondido: o Code.gs nao grava esses campos.
+  // Para reativar, voltar a incluir blocoInventarioFicha(c) aqui e fazer o Code.gs aceitar os campos.
   carregarPareceresFicha(c.ID);
 }
 
@@ -2281,10 +2303,41 @@ async function atualizarStatusCaso(casoId, status) {
       renderFicha(); return;
     }
   }
-  await api("atualizarStatusCaso", { id: casoId, status: status });
+  const params = { id: casoId, status: status };
+  if (status === "Execucao retomada") {
+    const op = prompt("Motivo da execução retomada:\n\n1 = Chefia recusou a instauração\n2 = Não cabe PTAC\n3 = Outro (você descreve)\n\nDigite 1, 2 ou 3:");
+    if (op === null) { renderFicha(); return; }
+    let motivo = ({ "1": "Chefia recusou a instauração", "2": "Não cabe PTAC" })[String(op).trim()];
+    if (!motivo) {
+      if (String(op).trim() !== "3") { alert("Opção não reconhecida. Nada foi alterado."); renderFicha(); return; }
+      const livre = prompt("Descreva o motivo:");
+      if (livre === null || !livre.trim()) { renderFicha(); return; }
+      motivo = "Outro: " + livre.trim();
+    }
+    params.motivo = motivo;
+  }
+  await api("atualizarStatusCaso", params);
   await carregarCasos();
   renderFicha();
   renderBusca();
+}
+
+async function salvarDadosCaso(casoId) {
+  const msg = document.getElementById("ficha-dados-msg-" + casoId);
+  const processo = document.getElementById("ficha-processo-" + casoId).value.trim();
+  const obs = document.getElementById("ficha-obs-" + casoId).value.trim();
+  msg.textContent = "Salvando...";
+  try {
+    const r1 = await api("atualizarCampoCaso", { id: casoId, campo: "processo", valor: processo });
+    const r2 = await api("atualizarCampoCaso", { id: casoId, campo: "observacoes", valor: obs });
+    if ((r1 && r1.erro) || (r2 && r2.erro)) { msg.textContent = "Erro: " + ((r1 && r1.erro) || (r2 && r2.erro)) + " (reimplante o Code.gs novo)"; return; }
+    await carregarCasos();
+    renderBusca();
+    const m2 = document.getElementById("ficha-dados-msg-" + casoId);
+    if (m2) m2.textContent = "Salvo.";
+  } catch (e) {
+    msg.textContent = "Não foi possível salvar. Tente de novo.";
+  }
 }
 
 async function confirmarEncaminharPtac(casoId, devedor) {
@@ -2307,6 +2360,7 @@ const corPorFasePTAC = {
   "Elaboracao de parecer": { bg: "#fdf3d8", texto: "#9a7207" },
   "Aprovacao pela chefia": { bg: "#eef7e0", texto: "#5a8f2e" },
   "Em cumprimento": { bg: "#e4eefa", texto: "#2b6cb0" },
+  "Execucao retomada": { bg: "#eceff1", texto: "#5a6472" },
   "Concluido": { bg: "#e1f5ee", texto: "#076b5e" },
   "Concluido/Extinto": { bg: "#e1f5ee", texto: "#076b5e" }
 };
