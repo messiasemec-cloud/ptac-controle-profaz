@@ -323,7 +323,7 @@ select:focus { border-color: var(--verde); }
         </div>
 
         <button class="btn-submit" onclick="registrarCaso()">Registrar caso</button>
-        <div class="feedback success" id="confirma-registro">Caso registrado. Ja aparece no andamento e no painel geral.</div>
+        <div class="feedback success" id="confirma-registro">Caso registrado como "Em análise". Aparece no andamento; entra nos indicadores e no painel público quando passar para "Instaurado".</div>
       </div>
     </div>
 
@@ -1354,7 +1354,7 @@ async function sairEdicaoValor(el, bemId) {
 
 // ---- Fluxo PTAC: rotulos, etapas ("com quem esta") e aprovacao 1/2 ----
 // O valor guardado na planilha continua "Aprovacao pela chefia"; so o texto exibido muda.
-const ROTULO_STATUS = { "Aprovacao pela chefia": "Aguardando aprovacao da chefia", "Execucao retomada": "Execução retomada" };
+const ROTULO_STATUS = { "Aprovacao pela chefia": "Aguardando aprovacao da chefia", "Execucao retomada": "Execução retomada", "Em analise": "Em análise" };
 function rotuloStatus(s) { return ROTULO_STATUS[s] || s; }
 
 function dataLocal(iso) {
@@ -1445,7 +1445,8 @@ const badgeClasse = {
   "Elaboracao de parecer": "badge-andamento",
   "Aprovacao pela chefia": "badge-andamento",
   "Em cumprimento": "badge-andamento",
-  "Execucao retomada": "badge-suspensa"
+  "Execucao retomada": "badge-suspensa",
+  "Em analise": "badge-analise"
 };
 
 let listaFocoId = null;
@@ -1616,7 +1617,7 @@ async function renderFicha() {
   const fase = c.Fase || (c.Eixo === "PTAC" ? "PTAC" : "Triagem");
 
   const STATUS_TRIAGEM = ["Identificado", "Pesquisando", "Habilitacao em andamento", "Habilitado", "Encaminhado ao PTAC"];
-  const STATUS_PTAC = ["Instaurado", "Oficio expedido a SEFIN", "Elaboracao de parecer", "Aprovacao pela chefia", "Em cumprimento", "Concluido"];
+  const STATUS_PTAC = ["Em analise", "Instaurado", "Oficio expedido a SEFIN", "Elaboracao de parecer", "Aprovacao pela chefia", "Em cumprimento", "Concluido"];
   const listaStatus = fase === "PTAC" ? STATUS_PTAC : STATUS_TRIAGEM;
   const retomada = c.Status === "Execucao retomada";
   // Execucao retomada e um desfecho fora das 6 etapas: so aparece no seletor, e a barra fica toda apagada.
@@ -2355,6 +2356,7 @@ function saldoCaso(c) {
 }
 
 const corPorFasePTAC = {
+  "Em analise": { bg: "#eef1f6", texto: "#4a5a73" },
   "Instaurado": { bg: "#fdecea", texto: "#c0392b" },
   "Oficio expedido a SEFIN": { bg: "#fdeee2", texto: "#b8541f" },
   "Elaboracao de parecer": { bg: "#fdf3d8", texto: "#9a7207" },
