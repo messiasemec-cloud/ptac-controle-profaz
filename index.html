@@ -299,13 +299,14 @@ select:focus { border-color: var(--verde); }
         </div>
 
         <div class="field-row">
-          <div><label>No processo referencia</label><input type="text" id="f-processo" placeholder="0000000-00.2026.8.06.0001">
+          <div><label id="lbl-f-processo">No processo referencia</label><input type="text" id="f-processo" placeholder="0000000-00.2026.8.06.0001">
             <div class="nota-campo">Informe o número da execução fiscal ou do processo administrativo (PA) pelo qual este caso é acompanhado.</div></div>
           <div><label>Saldo devedor (R$)</label><input type="number" id="f-saldo" placeholder="0"></div>
         </div>
 
         <div id="bloco-hab-form" style="display:none">
           <div class="field-row">
+            <div id="wrap-hab-fal"><label>Nº do processo de falência</label><input type="text" id="f-hab-fal"></div>
             <div><label>Nº do processo ou incidente de habilitação</label><input type="text" id="f-hab-proc"></div>
             <div><label>Valor da habilitação (R$)</label><input type="number" step="0.01" id="f-hab-valor" placeholder="vazio = usa o saldo devedor acima">
               <div class="nota-campo">Falência: incidente de classificação de crédito público (art. 7º-A da Lei 11.101/2005) ou habilitação. Inventário: autos do inventário.</div></div>
@@ -1281,6 +1282,7 @@ function escolherEixoForm(valor) {
   document.getElementById("bloco-inventario").style.display = (valor === "Inventario") ? "block" : "none";
   // sugestao do tipo de devedor conforme o eixo (pode ser trocado)
   const tipo = document.getElementById("f-tipo");
+  const wf = document.getElementById("wrap-hab-fal"); if (wf) wf.style.display = (valor === "Falencia") ? "" : "none";
   if (valor === "Falencia") tipo.value = "Massa falida";
   else if (valor === "Inventario") tipo.value = "Espolio";
   else if (valor === "PTAC" && (tipo.value === "Massa falida" || tipo.value === "Espolio")) tipo.value = "Pessoa juridica";
@@ -1300,6 +1302,7 @@ function escolherTipoCadastro(v) {
   const hab = v === "habilitacao";
   document.getElementById("campo-hipotese").style.display = hab ? "none" : "";
   document.getElementById("bloco-hab-form").style.display = hab ? "block" : "none";
+  document.getElementById("lbl-f-processo").textContent = hab ? "Nº da execução fiscal (EF)" : "No processo referencia";
   if (hab && eixoSelecionado === "PTAC") {
     // habilitacao so existe em inventario ou falencia: sugere pelo tipo do devedor
     const falencia = document.getElementById("f-tipo").value === "Massa falida";
@@ -1315,6 +1318,7 @@ async function registrarCaso() {
   const extraHab = hab ? {
     status: document.getElementById("f-hab-status").value,
     processohab: document.getElementById("f-hab-proc").value.trim(),
+    processofal: eixoSelecionado === "Falencia" ? document.getElementById("f-hab-fal").value.trim() : "",
     valorhab: document.getElementById("f-hab-valor").value || document.getElementById("f-saldo").value || "",
     databasehab: hojeIso()
   } : {};
@@ -1332,7 +1336,7 @@ async function registrarCaso() {
     valorBensEspolio: document.getElementById("f-valor-bens").value || "",
     hipotese: hab ? "" : hipoteseSelecionada
   }, extraHab));
-  ["f-devedor","f-doc","f-processo","f-saldo","f-obs","f-valor-bens","f-hab-proc","f-hab-valor"].forEach(id => document.getElementById(id).value = "");
+  ["f-devedor","f-doc","f-processo","f-saldo","f-obs","f-valor-bens","f-hab-proc","f-hab-fal","f-hab-valor"].forEach(id => document.getElementById(id).value = "");
   document.getElementById("f-resultado-pesquisa").value = "";
   document.getElementById("f-quem-pesquisou").value = "";
   hipoteseSelecionada = "";
@@ -1721,7 +1725,7 @@ async function renderFicha() {
       ${fase === "PTAC" && !emHab ? blocoAprovacaoFicha(c) : ""}
       ${(emHab || (c.Status === "Em analise" && eixoChave(c) !== "ptac")) ? blocoHabilitacaoFicha(c) : ""}
       <div class="field">
-        <label>Processo de referência</label>
+        <label>${(emHab || eixoChave(c) !== "ptac") ? "Nº da execução fiscal (EF)" : "Processo de referência"}</label>
         <input type="text" id="ficha-processo-${c.ID}" value="${escHtml(c.ProcessoReferencia || "")}" placeholder="0000000-00.2026.8.06.0001">
         <div class="nota-campo">Informe o número da execução fiscal ou do processo administrativo (PA) pelo qual este caso é acompanhado.</div>
       </div>
@@ -2408,10 +2412,14 @@ async function atualizarStatusCaso(casoId, status) {
 function blocoHabilitacaoFicha(c) {
   const base = c.DataBaseHabilitacao ? String(c.DataBaseHabilitacao).slice(0, 10) : "";
   const valor = (c.ValorHabilitado === "" || c.ValorHabilitado === undefined || c.ValorHabilitado === null) ? "" : c.ValorHabilitado;
+  const fal = eixoChave(c) === "falencia";
   return `<div class="field bloco bloco-hipotese">
     <label>Dados da habilitação</label>
     <div class="field-row" style="margin-top:8px">
+      ${fal ? `<div><label>Nº do processo de falência</label><input type="text" id="hab-fal-${c.ID}" value="${escHtml(c.ProcessoFalencia || "")}"></div>` : ""}
       <div><label>Nº do processo ou incidente de habilitação</label><input type="text" id="hab-proc-${c.ID}" value="${escHtml(c.ProcessoHabilitacao || "")}"></div>
+    </div>
+    <div class="field-row" style="margin-top:8px">
       <div><label>Valor da habilitação (R$)</label><input type="number" step="0.01" id="hab-valor-${c.ID}" value="${escHtml(valor)}"></div>
       <div><label>Data-base do valor</label><input type="date" id="hab-base-${c.ID}" value="${escHtml(base)}"></div>
     </div>
@@ -2427,7 +2435,9 @@ async function salvarDadosHabilitacao(casoId) {
   const msg = document.getElementById("hab-msg-" + casoId);
   msg.textContent = "Salvando...";
   try {
+    const campoFal = document.getElementById("hab-fal-" + casoId);
     const respostas = [
+      ...(campoFal ? [await api("atualizarCampoCaso", { id: casoId, campo: "processofal", valor: campoFal.value.trim() })] : []),
       await api("atualizarCampoCaso", { id: casoId, campo: "processohab", valor: document.getElementById("hab-proc-" + casoId).value.trim() }),
       await api("atualizarCampoCaso", { id: casoId, campo: "valorhab", valor: document.getElementById("hab-valor-" + casoId).value }),
       await api("atualizarCampoCaso", { id: casoId, campo: "databasehab", valor: document.getElementById("hab-base-" + casoId).value })

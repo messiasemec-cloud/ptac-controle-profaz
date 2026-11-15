@@ -640,6 +640,8 @@ function linhaHab(d, etiqueta) {
   const partes = [d.status === "Habilitado"
     ? (d.processo ? `<b style="color:#2f7a47">Habilitado ${noProc}, processo ${esc(d.processo)}</b>` : `<b style="color:#2f7a47">Habilitado ${noProc}</b> (processo não informado)`)
     : (d.processo ? "Processo/incidente: " + esc(d.processo) : "Processo/incidente não informado")];
+  if (d.processoFalencia) partes.push("Falência: " + esc(d.processoFalencia));
+  if (d.ef) partes.push("EF: " + esc(d.ef));
   if (d.valor !== null && d.valor !== undefined) partes.push((d.status === "Habilitado" ? "Valor habilitado: " : "Valor da habilitação: ") + fmt(d.valor) + (d.dataBase ? " em " + dataIsoBR(d.dataBase) : ""));
   const etq = etiqueta ? `<span class="etq hab">${d.eixo === "falencia" ? "Falência" : "Inventário"}</span>` : "";
   const nPar = d.pareceres.length;
