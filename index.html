@@ -1576,7 +1576,11 @@ function renderBusca() {
     row.innerHTML = `
       <div class="avatar">${iniciais(c.Devedor)}</div>
       <div style="flex:1;min-width:0">
-        <div class="lista-nome">${c.Devedor}${c.Documento ? ` <span style="font-weight:400;color:var(--texto-sec);font-size:12px">- ${c.Documento}</span>` : ""} ${casoDeHabilitacao(c) ? "" : `<span style="font-weight:400;color:var(--texto-sec);font-size:12px">· ${hInfo ? hInfo.citacao : "Hipotese nao informada"}</span>`}</div>
+        <div class="lista-nome">${c.Devedor}${c.Documento ? ` <span style="font-weight:400;color:var(--texto-sec);font-size:12px">- ${c.Documento}</span>` : ""} ${(() => {
+          // hipotese do PTAC: some em habilitacao; em Falencia/Inventario so aparece se ja foi informada
+          const txtH = casoDeHabilitacao(c) ? "" : (hInfo ? hInfo.citacao : (eixoChave(c) === "ptac" ? "Hipotese nao informada" : ""));
+          return txtH ? `<span style="font-weight:400;color:var(--texto-sec);font-size:12px">· ${txtH}</span>` : "";
+        })()}</div>
         <div style="font-size:13px;font-weight:600;color:var(--verde-escuro);margin-top:3px">${linhaValor}</div>
       </div>
       <div class="lista-acoes">
