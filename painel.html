@@ -61,6 +61,17 @@ body { font-family: 'Source Sans 3', sans-serif; background: #e4e8ec; color: var
 .grupo { padding: .5rem .75rem; margin-bottom: 0; }
 
 .linha { display: flex; align-items: center; gap: 12px; padding: 12px 10px; border-bottom: 1px solid var(--cinza-borda); border-radius: 6px; border-left: 3px solid transparent; }
+.subabas { display: flex; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap; }
+.subaba { background: var(--branco); border: 1.5px solid var(--cinza-borda); border-radius: 10px; padding: 9px 16px; font-family: inherit; font-size: 14px; font-weight: 600; color: var(--texto); cursor: pointer; display: flex; align-items: center; gap: 8px; }
+.subaba:hover { border-color: var(--verde); }
+.subaba.ativa { background: var(--verde); border-color: var(--verde); color: #fff; }
+.subaba .qtd { background: rgba(0,0,0,.08); border-radius: 12px; padding: 1px 8px; font-size: 12px; }
+.subaba.ativa .qtd { background: rgba(255,255,255,.25); }
+.etq { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; padding: 2px 8px; border-radius: 10px; margin-right: 6px; vertical-align: 1px; background: #e8f4f1; color: var(--verde-escuro); }
+.etq.hab { background: #f3ecfa; color: #6b46a3; }
+.nota-aba { font-size: 12.5px; color: var(--texto-sec); margin: 0 0 12px; line-height: 1.45; }
+.regra-hab { font-size: 12.5px; color: var(--texto-sec); line-height: 1.45; margin-top: 4px; }
+.mais { display: block; margin: 12px auto 0; }
 .item:last-child > .linha { border-bottom: none; }
 .item > .linha { cursor: pointer; }
 .item > .linha:hover { background: #f7f9fa; }
@@ -200,6 +211,9 @@ const FASES = {
   "Elaboracao de parecer": { r: "Elaboração de parecer", bg: "#fdf3d8", t: "#9a7207" },
   "Aprovacao pela chefia": { r: "Aguardando aprovação da chefia", bg: "#eef7e0", t: "#5a8f2e" },
   "Em cumprimento": { r: "Em cumprimento", bg: "#e4eefa", t: "#2b6cb0" },
+  "Em analise": { r: "Em análise", bg: "#eef1f6", t: "#4a5a73" },
+  "Habilitacao em andamento": { r: "Em habilitação", bg: "#f3ecfa", t: "#6b46a3" },
+  "Habilitado": { r: "Habilitado", bg: "#e6f4ea", t: "#2f7a47" },
   "Concluido": { r: "Concluído", bg: "#e1f5ee", t: "#076b5e" },
   "Concluido/Extinto": { r: "Concluído", bg: "#e1f5ee", t: "#076b5e" }
 };
@@ -207,6 +221,9 @@ const FASES = {
 const ICONE_DOC = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`;
 
 let devedores = [];
+let habilitacoes = [];
+let abaSel = "ptac";   // "ptac" | "inventario" | "falencia"
+let limiteLista = 50;
 let resumo = null;
 let carregado = false;
 let servidorDesatualizado = false;
@@ -281,6 +298,7 @@ async function carregar() {
     const r = await api("painelPtac");
     if (!r || r.erro || !Array.isArray(r.devedores)) throw new Error(r && r.erro ? r.erro : "resposta inesperada");
     devedores = r.devedores.map(d => Object.assign({}, d, { pareceres: Array.isArray(d.pareceres) ? d.pareceres : [] }));
+    habilitacoes = (Array.isArray(r.habilitacoes) ? r.habilitacoes : []).map(h => Object.assign({}, h, { hab: true }));
     resumo = r.resumo || null;
     // servidor (Code.gs) antigo: sem resumo e/ou sem a data de instauracao nos devedores
     servidorDesatualizado = !r.resumo || (r.devedores.length > 0 && r.devedores.every(d => !("dataInstauracao" in d)));
@@ -453,38 +471,103 @@ function ordemMeses(grupos) {
 
 function renderContribuintes() {
   const app = document.getElementById("app");
-  if (!devedores.length) { app.innerHTML = (servidorDesatualizado ? AVISO_VERSAO : "") + `<div class="card estado">Nenhum PTAC cadastrado ainda.</div>`; return; }
+  if (!devedores.length && !habilitacoes.length) { app.innerHTML = (servidorDesatualizado ? AVISO_VERSAO : "") + `<div class="card estado">Nenhum caso cadastrado ainda.</div>`; return; }
+  const nInv = habilitacoes.filter(h => h.eixo === "inventario").length;
+  const nFal = habilitacoes.filter(h => h.eixo === "falencia").length;
+  const sub = (chave, rotulo, n) => `<button class="subaba${abaSel === chave ? " ativa" : ""}" data-aba="${chave}" aria-pressed="${abaSel === chave}">${rotulo}<span class="qtd">${n}</span></button>`;
+  app.innerHTML = (servidorDesatualizado ? AVISO_VERSAO : "") + `
+    <div class="subabas" id="subabas">${sub("ptac", "PTAC", devedores.length)}${sub("inventario", "Inventário", nInv)}${sub("falencia", "Falência", nFal)}</div>
+    <input class="busca" id="busca" type="search" placeholder="Buscar em todas as abas por nome ou CPF/CNPJ" value="${esc(busca)}" autocomplete="off" style="margin-bottom:1rem">
+    <div id="area"></div>`;
+
+  document.getElementById("subabas").addEventListener("click", ev => {
+    const b = ev.target.closest(".subaba");
+    if (!b) return;
+    abaSel = b.dataset.aba;
+    limiteLista = 50;
+    renderContribuintes();
+  });
+  const campo = document.getElementById("busca");
+  campo.addEventListener("input", () => { busca = campo.value; limiteLista = 50; renderArea(); });
+  const area = document.getElementById("area");
+  area.addEventListener("click", cliqueLista);
+  area.addEventListener("keydown", tecladoLista);
+  renderArea();
+}
+
+function casaBusca(d) {
+  const termo = normaliza(busca);
+  const termoDigitos = busca.replace(/\D/g, "");
+  return normaliza(d.devedor).includes(termo)
+    || (termoDigitos && String(d.documento || "").replace(/\D/g, "").includes(termoDigitos));
+}
+
+// Escolhe o que mostrar: busca geral (todas as abas) ou a aba selecionada
+function renderArea() {
+  const area = document.getElementById("area");
+  if (normaliza(busca).trim()) { renderBuscaGeral(area); return; }
+  if (abaSel === "ptac") { renderAreaPtac(area); return; }
+  renderAreaHab(area, abaSel);
+}
+
+function botaoMais(restantes) {
+  return restantes > 0 ? `<button class="btn-secundario mais" id="btn-mais">Mostrar mais (${restantes} restantes)</button>` : "";
+}
+function ligarMais() {
+  const b = document.getElementById("btn-mais");
+  if (b) b.addEventListener("click", () => { limiteLista += 50; renderArea(); });
+}
+
+function renderBuscaGeral(area) {
+  const achados = [...devedores.filter(casaBusca), ...habilitacoes.filter(casaBusca)]
+    .sort((a, b) => normaliza(a.devedor).localeCompare(normaliza(b.devedor)));
+  if (!achados.length) {
+    area.innerHTML = `<div class="card estado" style="margin-top:1rem">Nenhum registro encontrado.<br><span style="font-size:12.5px">Esta consulta cobre apenas os casos cadastrados: PTAC instaurado e habilitação em inventário ou falência. O devedor pode estar em análise ou ainda não ter sido cadastrado.</span></div>`;
+    return;
+  }
+  const visiveis = achados.slice(0, limiteLista);
+  area.innerHTML = `<div class="mes-topo"><h2 class="mes-titulo">Resultados da busca</h2><span class="mes-resumo">${plural(achados.length, "resultado", "resultados")}</span></div>
+    <div class="card grupo">${visiveis.map(d => d.hab ? linhaHab(d, true) : linhaHtml(d, true)).join("")}</div>${botaoMais(achados.length - visiveis.length)}`;
+  ligarMais();
+}
+
+function renderAreaPtac(area) {
+  if (!devedores.length) { area.innerHTML = `<div class="card estado">Nenhum PTAC instaurado cadastrado ainda.</div>`; return; }
   const grupos = agruparPorMes(devedores);
   const chaves = ordemMeses(grupos);
   if (mesSel !== "todos" && !grupos[mesSel]) mesSel = "todos";
-
   const chip = (chave, rotulo) => `<button class="chip${mesSel === chave ? " ativo" : ""}" data-mes="${esc(chave)}" aria-pressed="${mesSel === chave}">${esc(rotulo)}</button>`;
-  app.innerHTML = (servidorDesatualizado ? AVISO_VERSAO : "") + `
+  area.innerHTML = `
     <div class="chips" id="chips">${chip("todos", "Todos")}${chaves.map(k => chip(k, rotuloChip(k))).join("")}</div>
-    <input class="busca" id="busca" type="search" placeholder="Buscar devedor por nome ou CPF/CNPJ" value="${esc(busca)}" autocomplete="off">
     <div class="dica">O ícone <b style="color:#6b4a93">📄</b> aparece nos devedores com parecer anexado: clique nele para visualizar.</div>
     <div id="lista-meses"></div>`;
-
   document.getElementById("chips").addEventListener("click", ev => {
     const b = ev.target.closest(".chip");
     if (!b) return;
     mesSel = b.dataset.mes;
-    renderContribuintes();
+    renderArea();
   });
-  const campo = document.getElementById("busca");
-  campo.addEventListener("input", () => { busca = campo.value; renderListaMeses(); });
-  document.getElementById("lista-meses").addEventListener("click", cliqueLista);
-  document.getElementById("lista-meses").addEventListener("keydown", tecladoLista);
   renderListaMeses();
 }
 
+function renderAreaHab(area, eixo) {
+  const rotulo = eixo === "inventario" ? "Inventário" : "Falência";
+  const lista = habilitacoes.filter(h => h.eixo === eixo)
+    .sort((a, b) => normaliza(a.devedor).localeCompare(normaliza(b.devedor)));
+  const nota = eixo === "inventario"
+    ? "Espólios com crédito apto à habilitação ou já habilitado no inventário. Consulte a situação antes de prosseguir com a execução fiscal (Portaria 53/2026-GPG, arts. 3º e 4º)."
+    : "Massas falidas com crédito apto à habilitação ou já habilitado na falência. Consulte a situação antes de prosseguir com a execução fiscal (Portaria 53/2026-GPG, arts. 2º e 4º).";
+  if (!lista.length) { area.innerHTML = `<p class="nota-aba">${nota}</p><div class="card estado">Nenhum caso de ${rotulo.toLowerCase()} em habilitação cadastrado ainda.</div>`; return; }
+  const hab = lista.filter(h => h.status === "Habilitado").length;
+  const visiveis = lista.slice(0, limiteLista);
+  area.innerHTML = `<p class="nota-aba">${nota}</p>
+    <div class="mes-topo"><h2 class="mes-titulo">${rotulo}</h2><span class="mes-resumo">${plural(lista.length, "caso", "casos")} · ${plural(hab, "habilitado", "habilitados")} · ${lista.length - hab} em andamento</span></div>
+    <div class="card grupo">${visiveis.map(d => linhaHab(d, false)).join("")}</div>${botaoMais(lista.length - visiveis.length)}`;
+  ligarMais();
+}
+
 function renderListaMeses() {
-  const termo = normaliza(busca);
-  const termoDigitos = busca.replace(/\D/g, "");
-  const filtrados = devedores.filter(d => !termo
-    || normaliza(d.devedor).includes(termo)
-    || (termoDigitos && String(d.documento || "").replace(/\D/g, "").includes(termoDigitos)));
-  const grupos = agruparPorMes(filtrados);
+  const grupos = agruparPorMes(devedores);
   const chaves = ordemMeses(grupos).filter(k => mesSel === "todos" || k === mesSel);
 
   const alvo = document.getElementById("lista-meses");
@@ -497,7 +580,7 @@ function renderListaMeses() {
         <h2 class="mes-titulo">${esc(tituloMes(k))}</h2>
         <span class="mes-resumo">${plural(lista.length, "PTAC", "PTACs")} · ${fmt(saldo)} · ${plural(exec, "execução", "execuções")}</span>
       </div>
-      <div class="card grupo">${lista.map(linhaHtml).join("")}</div>`;
+      <div class="card grupo">${lista.map(d => linhaHtml(d)).join("")}</div>`;
   }).join("");
 }
 
@@ -530,7 +613,49 @@ function barraFasesHtml(d) {
   return h + (datas.length ? `<div class="fase-datas">${datas.map(esc).join(" · ")}</div>` : "");
 }
 
-function linhaHtml(d) {
+const ETAPAS_HAB = ["Em analise", "Habilitacao em andamento", "Habilitado"];
+
+function barraHabHtml(d) {
+  const idx = Math.max(1, ETAPAS_HAB.indexOf(d.status));
+  let h = '<div class="fases" style="max-width:520px">';
+  ETAPAS_HAB.forEach((et, i) => {
+    const feito = i < idx || (i === idx && i === ETAPAS_HAB.length - 1);
+    const est = feito ? "feito" : (i === idx ? "atual" : "");
+    h += `<div class="fase"><div class="fase-bola ${est}">${feito ? "&#10003;" : i + 1}</div><div class="fase-nome ${est}">${esc(FASES[et].r)}</div></div>`;
+    if (i < ETAPAS_HAB.length - 1) h += `<div class="fase-ligacao ${i < idx ? "feito" : ""}"></div>`;
+  });
+  h += "</div>";
+  const falencia = d.eixo === "falencia";
+  const regra = d.status === "Habilitado"
+    ? (falencia
+        ? "Execução fiscal suspensa até o encerramento da falência (Portaria 53/2026-GPG, art. 2º, §1º). Novos ajuizamentos são interrompidos (art. 4º); créditos constituídos depois entram por nova habilitação ou aditamento (art. 4º, §1º)."
+        : "Execução fiscal suspensa até o encerramento do inventário (Portaria 53/2026-GPG, art. 3º, §1º). Novos ajuizamentos são interrompidos (art. 4º); créditos constituídos depois entram por nova habilitação ou aditamento (art. 4º, §1º).")
+    : `Crédito apto à habilitação: o procurador requer a suspensão da execução fiscal e comunica a Chefia da PROFAZ para as providências de habilitação (Portaria 53/2026-GPG, art. ${falencia ? "2º, II" : "3º, II"}).`;
+  return h + `<div class="regra-hab">${esc(regra)}</div>`;
+}
+
+function linhaHab(d, etiqueta) {
+  const aberto = abertos.has(String(d.casoId));
+  const noProc = d.eixo === "falencia" ? "na falência" : "no inventário";
+  const partes = [d.status === "Habilitado"
+    ? (d.processo ? `<b style="color:#2f7a47">Habilitado ${noProc}, processo ${esc(d.processo)}</b>` : `<b style="color:#2f7a47">Habilitado ${noProc}</b> (processo não informado)`)
+    : (d.processo ? "Processo/incidente: " + esc(d.processo) : "Processo/incidente não informado")];
+  if (d.valor !== null && d.valor !== undefined) partes.push((d.status === "Habilitado" ? "Valor habilitado: " : "Valor da habilitação: ") + fmt(d.valor) + (d.dataBase ? " em " + dataIsoBR(d.dataBase) : ""));
+  const etq = etiqueta ? `<span class="etq hab">${d.eixo === "falencia" ? "Falência" : "Inventário"}</span>` : "";
+  return `<div class="item${aberto ? " aberto" : ""}" data-caso="${esc(d.casoId)}">
+  <div class="linha" role="button" tabindex="0" aria-expanded="${aberto}" title="Clique para ver a situação">
+    <div class="avatar" style="background:#8a63b8">${esc(iniciais(d.devedor))}</div>
+    <div class="linha-corpo">
+      <div class="linha-nome">${etq}${esc(d.devedor)} <span>${d.documento ? "- " + esc(d.documento) : ""}</span></div>
+      <div class="linha-valores" style="color:var(--texto-sec);font-weight:500">${partes.join(" · ")}</div>
+    </div>
+    <div class="linha-lado">${selo(d.status, d)}<span class="seta" aria-hidden="true">&#9660;</span></div>
+  </div>
+  ${aberto ? `<div class="detalhe">${barraHabHtml(d)}</div>` : ""}
+  </div>`;
+}
+
+function linhaHtml(d, etiqueta) {
   const h = citacao(d.hipotese);
   const n = d.pareceres.length;
   const botao = n
@@ -541,7 +666,7 @@ function linhaHtml(d) {
   <div class="linha${concluidoStatus(d.status) ? " concluido" : ""}" role="button" tabindex="0" aria-expanded="${aberto}" title="Clique para ver as fases">
     <div class="avatar">${esc(iniciais(d.devedor))}</div>
     <div class="linha-corpo">
-      <div class="linha-nome">${esc(d.devedor)} <span>${d.documento ? "- " + esc(d.documento) : ""} · ${h ? esc(h) : "Hipótese não informada"}</span></div>
+      <div class="linha-nome">${etiqueta ? '<span class="etq">PTAC</span>' : ""}${esc(d.devedor)} <span>${d.documento ? "- " + esc(d.documento) : ""} · ${h ? esc(h) : "Hipótese não informada"}</span></div>
       <div class="linha-valores">${fmt(d.saldo)} · ${plural(Number(d.execucoes) || 0, "execução", "execuções")} · ${plural(Number(d.cdas) || 0, "CDA", "CDAs")}</div>
     </div>
     <div class="linha-lado">${selo(d.status, d)}${botao}<span class="seta" aria-hidden="true">&#9660;</span></div>
@@ -564,7 +689,7 @@ function cliqueLista(ev) {
 }
 function alternarFases(item) {
   const id = String(item.dataset.caso);
-  const d = devedores.find(x => String(x.casoId) === id);
+  const d = devedores.find(x => String(x.casoId) === id) || habilitacoes.find(x => String(x.casoId) === id);
   if (!d) return;
   const abrir = !abertos.has(id);
   if (abrir) abertos.add(id); else abertos.delete(id);
@@ -572,7 +697,7 @@ function alternarFases(item) {
   item.querySelector(".linha").setAttribute("aria-expanded", String(abrir));
   const atual = item.querySelector(".detalhe");
   if (atual) atual.remove();
-  if (abrir) item.insertAdjacentHTML("beforeend", `<div class="detalhe">${barraFasesHtml(d)}</div>`);
+  if (abrir) item.insertAdjacentHTML("beforeend", `<div class="detalhe">${d.hab ? barraHabHtml(d) : barraFasesHtml(d)}</div>`);
 }
 function tecladoLista(ev) {
   if (ev.key !== "Enter" && ev.key !== " ") return;

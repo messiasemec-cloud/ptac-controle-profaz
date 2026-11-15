@@ -602,7 +602,7 @@ async function abrirModalRelatorio() {
   document.getElementById("relatorio-status").textContent = "Carregando meses...";
   document.getElementById("modal-relatorio").style.display = "flex";
   await carregarCasos();
-  const todosPtac = casos.filter(c => c.Fase === "PTAC");
+  const todosPtac = casos.filter(casoPtacAtivo);
   const chaves = new Set();
   todosPtac.forEach(c => {
     [c.DataInstauracao, c.DataConclusao].forEach(d => {
@@ -915,7 +915,7 @@ async function gerarRelatorioDocx(dados) {
 
 async function obterDadosRelatorio(periodo) {
   await carregarCasos();
-  const todosPtac = casos.filter(c => c.Fase === "PTAC");
+  const todosPtac = casos.filter(casoPtacAtivo);
   const hoje = new Date();
   let inicio, fim, tituloPeriodo;
   if (periodo === "ano") {
@@ -1354,7 +1354,14 @@ async function sairEdicaoValor(el, bemId) {
 
 // ---- Fluxo PTAC: rotulos, etapas ("com quem esta") e aprovacao 1/2 ----
 // O valor guardado na planilha continua "Aprovacao pela chefia"; so o texto exibido muda.
-const ROTULO_STATUS = { "Aprovacao pela chefia": "Aguardando aprovacao da chefia", "Execucao retomada": "Execução retomada", "Em analise": "Em análise" };
+const ROTULO_STATUS = { "Aprovacao pela chefia": "Aguardando aprovacao da chefia", "Execucao retomada": "Execução retomada", "Em analise": "Em análise", "Habilitacao em andamento": "Em habilitação", "Habilitacao indeferida": "Habilitação indeferida" };
+// Habilitacao (Portaria 53/2026-GPG, arts. 2o e 3o): sai do fluxo PTAC e aparece na aba Inventario/Falencia do painel
+const STATUS_HAB = ["Habilitacao em andamento", "Habilitado"];
+const STATUS_HAB_INDEF = "Habilitacao indeferida";
+// trilha da habilitacao (espolio e falencia): Em analise > Em habilitacao > Habilitado
+const TRILHA_HAB = ["Em analise", "Habilitacao em andamento", "Habilitado"];
+// "Em analise" e "Execucao retomada" nao sao PTAC instaurado; habilitacao tambem nao
+const casoPtacAtivo = c => c.Fase === "PTAC" && c.Status !== "Execucao retomada" && c.Status !== "Em analise" && !STATUS_HAB.includes(c.Status) && c.Status !== STATUS_HAB_INDEF;
 function rotuloStatus(s) { return ROTULO_STATUS[s] || s; }
 
 function dataLocal(iso) {
@@ -1618,11 +1625,13 @@ async function renderFicha() {
 
   const STATUS_TRIAGEM = ["Identificado", "Pesquisando", "Habilitacao em andamento", "Habilitado", "Encaminhado ao PTAC"];
   const STATUS_PTAC = ["Em analise", "Instaurado", "Oficio expedido a SEFIN", "Elaboracao de parecer", "Aprovacao pela chefia", "Em cumprimento", "Concluido"];
-  const listaStatus = fase === "PTAC" ? STATUS_PTAC : STATUS_TRIAGEM;
+  const indef = c.Status === STATUS_HAB_INDEF;
+  const emHab = STATUS_HAB.includes(c.Status) || indef;
+  const listaStatus = emHab ? TRILHA_HAB : (fase === "PTAC" ? STATUS_PTAC : STATUS_TRIAGEM);
   const retomada = c.Status === "Execucao retomada";
   // Execucao retomada e um desfecho fora das 6 etapas: so aparece no seletor, e a barra fica toda apagada.
-  const opcoesStatus = fase === "PTAC" ? STATUS_PTAC.concat(["Execucao retomada"]) : STATUS_TRIAGEM;
-  const passoAtual = retomada ? -1 : Math.max(0, listaStatus.indexOf(c.Status));
+  const opcoesStatus = fase === "PTAC" ? STATUS_PTAC.concat(STATUS_HAB, [STATUS_HAB_INDEF, "Execucao retomada"]) : STATUS_TRIAGEM;
+  const passoAtual = retomada ? -1 : (indef ? 1 : Math.max(0, listaStatus.indexOf(c.Status)));
 
   let tracker = '<div class="status-tracker">';
   listaStatus.forEach((nome, i) => {
@@ -1649,6 +1658,7 @@ async function renderFicha() {
         </div>
       </div>
       ${tracker}
+      ${indef ? `<div class="aviso-retomada"><b>Habilitação indeferida.</b> ${c.MotivoHabilitacaoIndeferida ? "Motivo: " + escHtml(c.MotivoHabilitacaoIndeferida) + "." : "Sem motivo registrado."} Este status não aparece no painel público. Se o inventário já foi encerrado, o caso é de PTAC (Portaria 53/2026-GPG, art. 3º, §2º): para encaminhá-lo, mude o status para "Em análise". Se a execução deve seguir, use "Execução retomada".</div>` : ""}
       ${retomada ? `<div class="aviso-retomada"><b>Execução retomada.</b> ${c.MotivoExecucaoRetomada ? "Motivo: " + escHtml(c.MotivoExecucaoRetomada) + "." : "Sem motivo registrado."}${c.DataExecucaoRetomada ? " Registrado em " + fmtIso(c.DataExecucaoRetomada) + "." : ""} O caso não conta mais nos indicadores do PTAC.</div>` : ""}
       <div class="field">
         <label>Status do caso (${fase === "PTAC" ? "fluxo PTAC" : "triagem"})</label>
@@ -1664,7 +1674,8 @@ async function renderFicha() {
           <option value="Inventario" ${eixoChave(c) === "inventario" ? "selected" : ""}>Inventário</option>
         </select>
       </div>
-      ${fase === "PTAC" ? blocoAprovacaoFicha(c) : ""}
+      ${fase === "PTAC" && !emHab ? blocoAprovacaoFicha(c) : ""}
+      ${emHab ? blocoHabilitacaoFicha(c) : ""}
       <div class="field">
         <label>Processo de referência</label>
         <input type="text" id="ficha-processo-${c.ID}" value="${escHtml(c.ProcessoReferencia || "")}" placeholder="0000000-00.2026.8.06.0001">
@@ -2305,6 +2316,25 @@ async function atualizarStatusCaso(casoId, status) {
     }
   }
   const params = { id: casoId, status: status };
+  if (STATUS_HAB.includes(status) && c && eixoChave(c) === "ptac") {
+    // habilitacao aparece na aba Inventario ou Falencia do painel: precisa saber qual
+    const op = prompt("Em qual aba do painel este caso deve aparecer?\n\n1 = Inventário\n2 = Falência\n\nDigite 1 ou 2:");
+    const novoEixo = ({ "1": "Inventario", "2": "Falencia" })[String(op || "").trim()];
+    if (!novoEixo) { renderFicha(); return; }
+    await api("atualizarCampoCaso", { id: casoId, campo: "eixo", valor: novoEixo });
+  }
+  if (status === STATUS_HAB_INDEF) {
+    const opI = prompt("Motivo do indeferimento da habilitação:\n\n1 = Inventário já encerrado / partilha julgada (habilitação fora do prazo)\n2 = Outro (você descreve)\n\nDigite 1 ou 2:");
+    if (opI === null) { renderFicha(); return; }
+    let motivoI = ({ "1": "Inventário já encerrado / partilha julgada (habilitação fora do prazo)" })[String(opI).trim()];
+    if (!motivoI) {
+      if (String(opI).trim() !== "2") { alert("Opção não reconhecida. Nada foi alterado."); renderFicha(); return; }
+      const livreI = prompt("Descreva o motivo:");
+      if (livreI === null || !livreI.trim()) { renderFicha(); return; }
+      motivoI = "Outro: " + livreI.trim();
+    }
+    params.motivo = motivoI;
+  }
   if (status === "Execucao retomada") {
     const op = prompt("Motivo da execução retomada:\n\n1 = Chefia recusou a instauração\n2 = Não cabe PTAC\n3 = Outro (você descreve)\n\nDigite 1, 2 ou 3:");
     if (op === null) { renderFicha(); return; }
@@ -2318,9 +2348,54 @@ async function atualizarStatusCaso(casoId, status) {
     params.motivo = motivo;
   }
   await api("atualizarStatusCaso", params);
+  // Ao entrar em habilitacao, o valor ja vem do saldo do Agilis (foto do momento), se ainda estiver vazio
+  if (STATUS_HAB.includes(status) && c && (c.ValorHabilitado === undefined || c.ValorHabilitado === null || c.ValorHabilitado === "")) {
+    const saldoAgora = saldoCaso(c);
+    if (saldoAgora > 0) {
+      await api("atualizarCampoCaso", { id: casoId, campo: "valorhab", valor: saldoAgora });
+      await api("atualizarCampoCaso", { id: casoId, campo: "databasehab", valor: hojeIso() });
+    }
+  }
   await carregarCasos();
   renderFicha();
   renderBusca();
+}
+
+function blocoHabilitacaoFicha(c) {
+  const base = c.DataBaseHabilitacao ? String(c.DataBaseHabilitacao).slice(0, 10) : "";
+  const valor = (c.ValorHabilitado === "" || c.ValorHabilitado === undefined || c.ValorHabilitado === null) ? "" : c.ValorHabilitado;
+  return `<div class="field bloco bloco-hipotese">
+    <label>Dados da habilitação</label>
+    <div class="field-row" style="margin-top:8px">
+      <div><label>Nº do processo ou incidente de habilitação</label><input type="text" id="hab-proc-${c.ID}" value="${escHtml(c.ProcessoHabilitacao || "")}"></div>
+      <div><label>Valor da habilitação (R$)</label><input type="number" step="0.01" id="hab-valor-${c.ID}" value="${escHtml(valor)}"></div>
+      <div><label>Data-base do valor</label><input type="date" id="hab-base-${c.ID}" value="${escHtml(base)}"></div>
+    </div>
+    <div class="nota-campo">Falência: número do incidente de classificação de crédito público (art. 7º-A da Lei 11.101/2005) ou da habilitação. Inventário: número dos autos do inventário. Ao entrar em habilitação, o valor vem preenchido com o saldo do Ágilis daquele dia (ajuste se precisar). Na falência, confira com a relação de credores.</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+      <button type="button" class="btn-submit" style="width:auto;padding:7px 16px" onclick="salvarDadosHabilitacao('${c.ID}')">Salvar dados da habilitação</button>
+      <span id="hab-msg-${c.ID}" style="font-size:13px;color:var(--texto-sec)"></span>
+    </div>
+  </div>`;
+}
+
+async function salvarDadosHabilitacao(casoId) {
+  const msg = document.getElementById("hab-msg-" + casoId);
+  msg.textContent = "Salvando...";
+  try {
+    const respostas = [
+      await api("atualizarCampoCaso", { id: casoId, campo: "processohab", valor: document.getElementById("hab-proc-" + casoId).value.trim() }),
+      await api("atualizarCampoCaso", { id: casoId, campo: "valorhab", valor: document.getElementById("hab-valor-" + casoId).value }),
+      await api("atualizarCampoCaso", { id: casoId, campo: "databasehab", valor: document.getElementById("hab-base-" + casoId).value })
+    ];
+    const erro = respostas.find(r => r && r.erro);
+    if (erro) { msg.textContent = "Erro: " + erro.erro + " (reimplante o Code.gs novo)"; return; }
+    await carregarCasos();
+    const m2 = document.getElementById("hab-msg-" + casoId);
+    if (m2) m2.textContent = "Salvo.";
+  } catch (e) {
+    msg.textContent = "Não foi possível salvar. Tente de novo.";
+  }
 }
 
 async function salvarDadosCaso(casoId) {
@@ -2357,6 +2432,8 @@ function saldoCaso(c) {
 
 const corPorFasePTAC = {
   "Em analise": { bg: "#eef1f6", texto: "#4a5a73" },
+  "Habilitacao em andamento": { bg: "#f3ecfa", texto: "#6b46a3" },
+  "Habilitado": { bg: "#e6f4ea", texto: "#2f7a47" },
   "Instaurado": { bg: "#fdecea", texto: "#c0392b" },
   "Oficio expedido a SEFIN": { bg: "#fdeee2", texto: "#b8541f" },
   "Elaboracao de parecer": { bg: "#fdf3d8", texto: "#9a7207" },
