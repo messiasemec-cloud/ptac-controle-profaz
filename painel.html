@@ -298,7 +298,7 @@ async function carregar() {
     const r = await api("painelPtac");
     if (!r || r.erro || !Array.isArray(r.devedores)) throw new Error(r && r.erro ? r.erro : "resposta inesperada");
     devedores = r.devedores.map(d => Object.assign({}, d, { pareceres: Array.isArray(d.pareceres) ? d.pareceres : [] }));
-    habilitacoes = (Array.isArray(r.habilitacoes) ? r.habilitacoes : []).map(h => Object.assign({}, h, { hab: true }));
+    habilitacoes = (Array.isArray(r.habilitacoes) ? r.habilitacoes : []).map(h => Object.assign({}, h, { hab: true, pareceres: Array.isArray(h.pareceres) ? h.pareceres : [] }));
     resumo = r.resumo || null;
     // servidor (Code.gs) antigo: sem resumo e/ou sem a data de instauracao nos devedores
     servidorDesatualizado = !r.resumo || (r.devedores.length > 0 && r.devedores.every(d => !("dataInstauracao" in d)));
@@ -642,6 +642,10 @@ function linhaHab(d, etiqueta) {
     : (d.processo ? "Processo/incidente: " + esc(d.processo) : "Processo/incidente não informado")];
   if (d.valor !== null && d.valor !== undefined) partes.push((d.status === "Habilitado" ? "Valor habilitado: " : "Valor da habilitação: ") + fmt(d.valor) + (d.dataBase ? " em " + dataIsoBR(d.dataBase) : ""));
   const etq = etiqueta ? `<span class="etq hab">${d.eixo === "falencia" ? "Falência" : "Inventário"}</span>` : "";
+  const nPar = d.pareceres.length;
+  const botaoPar = nPar
+    ? `<button class="btn-parecer" data-caso="${esc(d.casoId)}" title="${nPar > 1 ? "Clique aqui para visualizar os pareceres" : "Clique aqui para visualizar o parecer"}" aria-label="Visualizar parecer de ${esc(d.devedor)}">${ICONE_DOC}${nPar > 1 ? `<span class="qtd">${nPar}</span>` : ""}</button>`
+    : "";
   return `<div class="item${aberto ? " aberto" : ""}" data-caso="${esc(d.casoId)}">
   <div class="linha" role="button" tabindex="0" aria-expanded="${aberto}" title="Clique para ver a situação">
     <div class="avatar" style="background:#8a63b8">${esc(iniciais(d.devedor))}</div>
@@ -649,7 +653,7 @@ function linhaHab(d, etiqueta) {
       <div class="linha-nome">${etq}${esc(d.devedor)} <span>${d.documento ? "- " + esc(d.documento) : ""}</span></div>
       <div class="linha-valores" style="color:var(--texto-sec);font-weight:500">${partes.join(" · ")}</div>
     </div>
-    <div class="linha-lado">${selo(d.status, d)}<span class="seta" aria-hidden="true">&#9660;</span></div>
+    <div class="linha-lado">${selo(d.status, d)}${botaoPar}<span class="seta" aria-hidden="true">&#9660;</span></div>
   </div>
   ${aberto ? `<div class="detalhe">${barraHabHtml(d)}</div>` : ""}
   </div>`;
@@ -679,7 +683,7 @@ function linhaHtml(d, etiqueta) {
 function cliqueLista(ev) {
   const botao = ev.target.closest(".btn-parecer");
   if (botao) {
-    const d = devedores.find(x => String(x.casoId) === botao.dataset.caso);
+    const d = devedores.find(x => String(x.casoId) === botao.dataset.caso) || habilitacoes.find(x => String(x.casoId) === botao.dataset.caso);
     if (d && d.pareceres.length) abrirVisualizador({ devedor: d.devedor, pareceres: d.pareceres });
     return;
   }

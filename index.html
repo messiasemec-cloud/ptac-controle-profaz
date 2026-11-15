@@ -263,6 +263,14 @@ select:focus { border-color: var(--verde); }
         <div class="form-sub">Preencha os dados do devedor para incluir no controle</div>
 
         <div class="field">
+          <label>Cadastrar como</label>
+          <select id="f-cadastro" onchange="escolherTipoCadastro(this.value)">
+            <option value="ptac">PTAC (começa em "Em análise")</option>
+            <option value="habilitacao">Habilitação em inventário ou falência (não é PTAC)</option>
+          </select>
+        </div>
+
+        <div class="field">
           <label>Eixo</label>
           <select id="f-eixo" onchange="escolherEixoForm(this.value)">
             <option value="PTAC">PTAC</option>
@@ -271,7 +279,7 @@ select:focus { border-color: var(--verde); }
           </select>
         </div>
 
-        <div class="field">
+        <div class="field" id="campo-hipotese">
           <label>Hipotese de incidencia (Art. 5º, §1º, Portaria 53/2026-GPG)</label>
           <button type="button" class="btn-buscar" style="background:var(--branco);color:var(--texto);border:1.5px solid var(--cinza-borda);text-align:left;font-weight:400" onclick="abrirModalHipotese()">
             <span id="hipotese-resumo">Selecionar hipotese...</span>
@@ -294,6 +302,17 @@ select:focus { border-color: var(--verde); }
           <div><label>No processo referencia</label><input type="text" id="f-processo" placeholder="0000000-00.2026.8.06.0001">
             <div class="nota-campo">Informe o número da execução fiscal ou do processo administrativo (PA) pelo qual este caso é acompanhado.</div></div>
           <div><label>Saldo devedor (R$)</label><input type="number" id="f-saldo" placeholder="0"></div>
+        </div>
+
+        <div id="bloco-hab-form" style="display:none">
+          <div class="field-row">
+            <div><label>Nº do processo ou incidente de habilitação</label><input type="text" id="f-hab-proc"></div>
+            <div><label>Valor da habilitação (R$)</label><input type="number" step="0.01" id="f-hab-valor" placeholder="vazio = usa o saldo devedor acima">
+              <div class="nota-campo">Falência: incidente de classificação de crédito público (art. 7º-A da Lei 11.101/2005) ou habilitação. Inventário: autos do inventário.</div></div>
+          </div>
+          <div class="field"><label>Situação ao cadastrar</label>
+            <select id="f-hab-status"><option value="Habilitacao em andamento">Em habilitação</option><option value="Habilitado">Habilitado</option></select>
+          </div>
         </div>
 
         <div class="field"><label>Observacoes</label><textarea id="f-obs"></textarea></div>
@@ -1277,10 +1296,29 @@ async function alterarEixoCaso(id, valor) {
   renderBusca();
 }
 
+function escolherTipoCadastro(v) {
+  const hab = v === "habilitacao";
+  document.getElementById("campo-hipotese").style.display = hab ? "none" : "";
+  document.getElementById("bloco-hab-form").style.display = hab ? "block" : "none";
+  if (hab && eixoSelecionado === "PTAC") {
+    // habilitacao so existe em inventario ou falencia: sugere pelo tipo do devedor
+    const falencia = document.getElementById("f-tipo").value === "Massa falida";
+    document.getElementById("f-eixo").value = falencia ? "Falencia" : "Inventario";
+    escolherEixoForm(falencia ? "Falencia" : "Inventario");
+  }
+}
+
 async function registrarCaso() {
   const devedor = document.getElementById("f-devedor").value.trim();
   if (!devedor) return;
-  await api("registrarCaso", {
+  const hab = document.getElementById("f-cadastro").value === "habilitacao";
+  const extraHab = hab ? {
+    status: document.getElementById("f-hab-status").value,
+    processohab: document.getElementById("f-hab-proc").value.trim(),
+    valorhab: document.getElementById("f-hab-valor").value || document.getElementById("f-saldo").value || "",
+    databasehab: hojeIso()
+  } : {};
+  await api("registrarCaso", Object.assign({
     eixo: eixoSelecionado,
     responsavel: respSelecionado,
     devedor: devedor,
@@ -1292,9 +1330,9 @@ async function registrarCaso() {
     resultadoPesquisa: document.getElementById("f-resultado-pesquisa").value,
     quemPesquisou: document.getElementById("f-quem-pesquisou").value,
     valorBensEspolio: document.getElementById("f-valor-bens").value || "",
-    hipotese: hipoteseSelecionada
-  });
-  ["f-devedor","f-doc","f-processo","f-saldo","f-obs","f-valor-bens"].forEach(id => document.getElementById(id).value = "");
+    hipotese: hab ? "" : hipoteseSelecionada
+  }, extraHab));
+  ["f-devedor","f-doc","f-processo","f-saldo","f-obs","f-valor-bens","f-hab-proc","f-hab-valor"].forEach(id => document.getElementById(id).value = "");
   document.getElementById("f-resultado-pesquisa").value = "";
   document.getElementById("f-quem-pesquisou").value = "";
   hipoteseSelecionada = "";
@@ -1358,6 +1396,8 @@ const ROTULO_STATUS = { "Aprovacao pela chefia": "Aguardando aprovacao da chefia
 // Habilitacao (Portaria 53/2026-GPG, arts. 2o e 3o): sai do fluxo PTAC e aparece na aba Inventario/Falencia do painel
 const STATUS_HAB = ["Habilitacao em andamento", "Habilitado"];
 const STATUS_HAB_INDEF = "Habilitacao indeferida";
+// caso de habilitacao (nao e PTAC): nao mostra nada de hipotese do PTAC
+const casoDeHabilitacao = c => STATUS_HAB.includes(c.Status) || c.Status === STATUS_HAB_INDEF;
 // trilha da habilitacao (espolio e falencia): Em analise > Em habilitacao > Habilitado
 const TRILHA_HAB = ["Em analise", "Habilitacao em andamento", "Habilitado"];
 // "Em analise" e "Execucao retomada" nao sao PTAC instaurado; habilitacao tambem nao
@@ -1536,7 +1576,7 @@ function renderBusca() {
     row.innerHTML = `
       <div class="avatar">${iniciais(c.Devedor)}</div>
       <div style="flex:1;min-width:0">
-        <div class="lista-nome">${c.Devedor}${c.Documento ? ` <span style="font-weight:400;color:var(--texto-sec);font-size:12px">- ${c.Documento}</span>` : ""} <span style="font-weight:400;color:var(--texto-sec);font-size:12px">· ${hInfo ? hInfo.citacao : "Hipotese nao informada"}</span></div>
+        <div class="lista-nome">${c.Devedor}${c.Documento ? ` <span style="font-weight:400;color:var(--texto-sec);font-size:12px">- ${c.Documento}</span>` : ""} ${casoDeHabilitacao(c) ? "" : `<span style="font-weight:400;color:var(--texto-sec);font-size:12px">· ${hInfo ? hInfo.citacao : "Hipotese nao informada"}</span>`}</div>
         <div style="font-size:13px;font-weight:600;color:var(--verde-escuro);margin-top:3px">${linhaValor}</div>
       </div>
       <div class="lista-acoes">
@@ -1689,7 +1729,7 @@ async function renderFicha() {
           <span id="ficha-dados-msg-${c.ID}" style="font-size:13px;color:var(--texto-sec)"></span>
         </div>
       </div>
-      <div class="field bloco bloco-hipotese">
+      ${emHab ? "" : `<div class="field bloco bloco-hipotese">
         <label>Hipotese de incidencia</label>
         <div style="font-size:13.5px;color:var(--texto);margin-bottom:6px">
           ${hipoteseInfo(c.HipoteseIncidencia)
@@ -1697,7 +1737,7 @@ async function renderFicha() {
             : `<span style="color:var(--texto-sec)">A hipotese de incidencia ainda nao foi informada para este caso.</span>`}
         </div>
         <a href="#" style="font-size:12.5px;color:var(--verde);text-decoration:underline" onclick="abrirModalHipotese('${c.ID}'); return false;">${c.HipoteseIncidencia ? "Alterar hipotese" : "Selecionar hipotese"}</a>
-      </div>
+      </div>`}
       ${podeEncaminharPtac ? `<button class="btn-buscar" style="background:var(--laranja);margin-bottom:1rem" onclick="confirmarEncaminharPtac('${c.ID}','${c.Devedor.replace(/'/g,"\\'")}')">Encaminhar ao PTAC</button>` : ""}
       <div class="field bloco bloco-importar">
         <label>Importar planilha de CDAs do Agilis (atualiza saldo, CDAs e execucoes deste devedor)</label>
