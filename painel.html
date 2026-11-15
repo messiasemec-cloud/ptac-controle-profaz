@@ -643,6 +643,9 @@ function linhaHab(d, etiqueta) {
   if (d.processoFalencia) partes.push("Falência: " + esc(d.processoFalencia));
   if (d.ef) partes.push("EF: " + esc(d.ef));
   if (d.valor !== null && d.valor !== undefined) partes.push((d.status === "Habilitado" ? "Valor habilitado: " : "Valor da habilitação: ") + fmt(d.valor) + (d.dataBase ? " em " + dataIsoBR(d.dataBase) : ""));
+  const sal = Number(d.saldo) || 0;
+  const linhaSaldo = `Saldo devedor atual: ${fmt(sal)} · ${plural(Number(d.execucoes) || 0, "execução", "execuções")} · ${plural(Number(d.cdas) || 0, "CDA", "CDAs")}`
+    + ((d.valor !== null && d.valor !== undefined && sal > d.valor + 0.005) ? ` · <b style="color:#b26a00">${fmt(sal - d.valor)} acima do habilitado (a conferir)</b>` : "");
   const etq = etiqueta ? `<span class="etq hab">${d.eixo === "falencia" ? "Falência" : "Inventário"}</span>` : "";
   const nPar = d.pareceres.length;
   const botaoPar = nPar
@@ -654,6 +657,7 @@ function linhaHab(d, etiqueta) {
     <div class="linha-corpo">
       <div class="linha-nome">${etq}${esc(d.devedor)} <span>${d.documento ? "- " + esc(d.documento) : ""}</span></div>
       <div class="linha-valores" style="color:var(--texto-sec);font-weight:500">${partes.join(" · ")}</div>
+      <div class="linha-valores">${linhaSaldo}</div>
     </div>
     <div class="linha-lado">${selo(d.status, d)}${botaoPar}<span class="seta" aria-hidden="true">&#9660;</span></div>
   </div>

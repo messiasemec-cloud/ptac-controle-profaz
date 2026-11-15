@@ -1586,6 +1586,24 @@ function renderBusca() {
           return txtH ? `<span style="font-weight:400;color:var(--texto-sec);font-size:12px">· ${txtH}</span>` : "";
         })()}</div>
         <div style="font-size:13px;font-weight:600;color:var(--verde-escuro);margin-top:3px">${linhaValor}</div>
+        ${(() => {
+          // situacao da habilitacao: so para Falencia/Inventario ou casos ja em habilitacao
+          if (eixoChave(c) === "ptac" && !casoDeHabilitacao(c)) return "";
+          let t, cor = "var(--texto-sec)";
+          if (c.Status === "Habilitado") {
+            const v = (c.ValorHabilitado === "" || c.ValorHabilitado === undefined || c.ValorHabilitado === null) ? null : Number(c.ValorHabilitado);
+            t = "Habilitado" + (c.ProcessoHabilitacao ? " no processo " + escHtml(c.ProcessoHabilitacao) : "") + (v !== null && !isNaN(v) ? " · " + fmt(v) : "");
+            cor = "#2f7a47";
+          } else if (c.Status === "Habilitacao em andamento") {
+            t = "Em habilitação" + (c.ProcessoHabilitacao ? " · " + escHtml(c.ProcessoHabilitacao) : "");
+            cor = "#8a63b8";
+          } else if (c.Status === STATUS_HAB_INDEF) {
+            t = "Habilitação indeferida"; cor = "#b0431a";
+          } else {
+            t = "Sem habilitação";
+          }
+          return `<div style="font-size:12px;font-weight:600;color:${cor};margin-top:2px">${t}</div>`;
+        })()}
       </div>
       <div class="lista-acoes">
         ${selo}
