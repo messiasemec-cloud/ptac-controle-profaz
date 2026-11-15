@@ -1719,7 +1719,7 @@ async function renderFicha() {
         </select>
       </div>
       ${fase === "PTAC" && !emHab ? blocoAprovacaoFicha(c) : ""}
-      ${emHab ? blocoHabilitacaoFicha(c) : ""}
+      ${(emHab || (c.Status === "Em analise" && eixoChave(c) !== "ptac")) ? blocoHabilitacaoFicha(c) : ""}
       <div class="field">
         <label>Processo de referência</label>
         <input type="text" id="ficha-processo-${c.ID}" value="${escHtml(c.ProcessoReferencia || "")}" placeholder="0000000-00.2026.8.06.0001">
