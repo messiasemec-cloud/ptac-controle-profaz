@@ -1310,7 +1310,7 @@ const efPendentes = c => Math.max(0, efTot(c) - (Number(c.efSuspensas) || 0));
 function sufixoEFs(c) {
   if (!casoComSuspensao(c) || !(efTot(c) > 0)) return "";
   const s = Number(c.efSuspensas) || 0, pe = Number(c.efPedidos) || 0, p = efPendentes(c) - pe;
-  return ` (<span style="color:#7a52a8">${s} suspensa${s === 1 ? "" : "s"}</span>${pe ? ` · <span style="color:#b26a00">${pe} com pedido</span>` : ""} · <span style="color:#c0392b">${p} pendente${p === 1 ? "" : "s"}</span>)`;
+  return ` (<span style="color:#5a9e2f">${s} suspensa${s === 1 ? "" : "s"}</span>${pe ? ` · <span style="color:#b26a00">${pe} com pedido</span>` : ""} · <span style="color:#c0392b">${p} pendente${p === 1 ? "" : "s"}</span>)`;
 }
 
 function baixarPeticaoSuspensao(eixo) {
@@ -1326,7 +1326,7 @@ function blocoEFsFicha(c) {
   const totEf = efTot(c);
   const ped = Number(c.efPedidos) || 0, pendSo = efPendentes(c) - ped;
   const resumo = totEf
-    ? `<b>${totEf}</b> execuç${totEf === 1 ? "ão" : "ões"} · <b style="color:#7a52a8">${susp} suspensa${susp === 1 ? "" : "s"}</b>${ped ? ` · <b style="color:#b26a00">${ped} com pedido protocolado</b>` : ""} · <b style="color:#c0392b">${pendSo} pendente${pendSo === 1 ? "" : "s"}</b>`
+    ? `<b>${totEf}</b> execuç${totEf === 1 ? "ão" : "ões"} · <b style="color:#5a9e2f">${susp} suspensa${susp === 1 ? "" : "s"}</b>${ped ? ` · <b style="color:#b26a00">${ped} com pedido protocolado</b>` : ""} · <b style="color:#c0392b">${pendSo} pendente${pendSo === 1 ? "" : "s"}</b>`
     : `Nenhuma EF listada ainda. Importe a planilha de CDAs do Ágilis para listar as execuções deste devedor.`;
   const semLista = !tot && totEf > 0 ? `<div class="nota-campo" style="margin-bottom:4px">Todas as ${totEf} execuções começam como pendentes. Importe a planilha de CDAs do Ágilis para listar os números e ir marcando as suspensas.</div>` : "";
   return `<div class="field bloco bloco-hipotese" id="bloco-efs-${c.ID}">
@@ -1379,7 +1379,7 @@ function desenharEFs(casoId, mais) {
   const br = d => String(d).slice(0, 10).split("-").reverse().join("/");
   alvo.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
       <div><div class="modal-titulo">Execuções fiscais — ${escHtml(c.Devedor || "")}</div>
-      <div class="modal-sub">${ativas.length} execuções · <b style="color:#7a52a8">${susp} suspensas</b> · <b style="color:#b26a00">${ped} com pedido protocolado</b> · <b style="color:#c0392b">${pend} pendentes</b></div></div>
+      <div class="modal-sub">${ativas.length} execuções · <b style="color:#5a9e2f">${susp} suspensas</b> · <b style="color:#b26a00">${ped} com pedido protocolado</b> · <b style="color:#c0392b">${pend} pendentes</b></div></div>
       <button type="button" class="btn-submit" style="width:auto;padding:5px 12px;background:var(--branco);color:var(--texto);border:1.5px solid var(--cinza-borda)" onclick="fecharModalEFs()">Fechar</button>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">
@@ -1421,7 +1421,7 @@ async function conferirEFAusente(casoId, processo) {
 const ETAPAS_EF = [
   { v: "", rot: "Pendente", cor: "#c0392b" },
   { v: "Pedido", rot: "Pedido protocolado", cor: "#b26a00" },
-  { v: "Sim", rot: "Suspensa", cor: "#7a52a8" }
+  { v: "Sim", rot: "Suspensa", cor: "#5a9e2f" }
 ];
 function trilhaEF(casoId, i, sit) {
   const atual = Math.max(0, ETAPAS_EF.findIndex(e => e.v === sit));
