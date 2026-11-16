@@ -1393,11 +1393,7 @@ function desenharEFs(casoId, mais) {
     ${ativas.slice(0, limite).map(o => { const sit = o.x.situacao || (o.x.suspensa ? "Sim" : ""); return `<div style="display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 0">
         <span style="font-variant-numeric:tabular-nums;flex:1">${escHtml(o.x.processo)}</span>
         ${sit && o.x.data ? `<span style="color:var(--texto-sec);font-size:12px">${sit === "Sim" ? "suspensa" : "pedido"} em ${br(o.x.data)}</span>` : ""}
-        <select style="width:auto;padding:3px 6px;font-size:12.5px" onchange="marcarEF('${casoId}', ${o.i}, this.value)">
-          <option value="" ${sit === "" ? "selected" : ""}>Pendente</option>
-          <option value="Pedido" ${sit === "Pedido" ? "selected" : ""}>Pedido protocolado</option>
-          <option value="Sim" ${sit === "Sim" ? "selected" : ""}>Suspensa</option>
-        </select>
+        ${trilhaEF(casoId, o.i, sit)}
       </div>`; }).join("") || '<div style="font-size:13px;color:var(--texto-sec)">Nenhuma EF ativa listada.</div>'}
     ${ativas.length > limite ? `<a href="#" style="font-size:13px;color:var(--verde)" onclick="desenharEFs('${casoId}', true); return false;">Mostrar mais (${ativas.length - limite} restantes)</a>` : ""}
     </div>
@@ -1422,7 +1418,26 @@ async function conferirEFAusente(casoId, processo) {
   await carregarEFs(casoId);
 }
 
+// linha do tempo de uma EF: Pendente -> Pedido protocolado -> Suspensa (clique na bolinha para mudar)
+const ETAPAS_EF = [
+  { v: "", rot: "Pendente", cor: "#b26a00" },
+  { v: "Pedido", rot: "Pedido protocolado", cor: "#8a63b8" },
+  { v: "Sim", rot: "Suspensa", cor: "#2f7a47" }
+];
+function trilhaEF(casoId, i, sit) {
+  const atual = Math.max(0, ETAPAS_EF.findIndex(e => e.v === sit));
+  return `<div style="display:flex;align-items:flex-start">` + ETAPAS_EF.map((e, k) => {
+    const feito = k <= atual, cor = ETAPAS_EF[atual].cor;
+    const linha = k > 0 ? `<div style="width:26px;height:2px;margin-top:8px;background:${k <= atual ? cor : "var(--cinza-borda)"}"></div>` : "";
+    return linha + `<button type="button" title="${e.rot}" aria-label="${e.rot}" onclick="marcarEF('${casoId}', ${i}, '${e.v}')" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;width:78px">
+      <span style="width:18px;height:18px;border-radius:50%;box-sizing:border-box;border:2px solid ${feito ? cor : "var(--cinza-borda)"};background:${k === atual ? cor : (feito ? cor : "var(--branco)")};color:#fff;font-size:11px;line-height:14px;text-align:center">${k < atual ? "&#10003;" : ""}</span>
+      <span style="font-size:10.5px;margin-top:2px;text-align:center;line-height:1.1;color:${k === atual ? cor : "var(--texto-sec)"};font-weight:${k === atual ? 700 : 400}">${e.rot}</span>
+    </button>`;
+  }).join("") + `</div>`;
+}
+
 async function marcarEF(casoId, i, situacao) {
+  if ((efsCache[casoId][i].situacao || (efsCache[casoId][i].suspensa ? "Sim" : "")) === situacao) return;
   const x = efsCache[casoId][i];
   const r = await apiPost("marcarEFs", { casoId: casoId, processos: [x.processo], situacao: situacao });
   if (r && r.erro) { alert("Erro: " + r.erro + " (reimplante o Code.gs novo)"); desenharEFs(casoId); return; }
