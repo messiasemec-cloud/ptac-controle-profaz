@@ -677,7 +677,7 @@ function linhaHtml(d, etiqueta) {
     <div class="avatar">${esc(iniciais(d.devedor))}</div>
     <div class="linha-corpo">
       <div class="linha-nome">${etiqueta ? '<span class="etq">PTAC</span>' : ""}${esc(d.devedor)} <span>${d.documento ? "- " + esc(d.documento) : ""} · ${h ? esc(h) : "Hipótese não informada"}</span></div>
-      <div class="linha-valores">${fmt(d.saldo)} · ${plural(Number(d.execucoes) || 0, "execução", "execuções")} · ${plural(Number(d.cdas) || 0, "CDA", "CDAs")}</div>
+      <div class="linha-valores">${fmt(d.saldo)} · ${plural(Number(d.execucoes) || 0, "execução", "execuções")} · ${plural(Number(d.cdas) || 0, "CDA", "CDAs")}${d.parcial ? ' · <b style="color:#b26a00">⚠ PTAC parcial</b>' : ""}</div>
     </div>
     <div class="linha-lado">${selo(d.status, d)}${botao}<span class="seta" aria-hidden="true">&#9660;</span></div>
   </div>

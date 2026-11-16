@@ -1288,6 +1288,13 @@ function escolherEixoForm(valor) {
   else if (valor === "PTAC" && (tipo.value === "Massa falida" || tipo.value === "Espolio")) tipo.value = "Pessoa juridica";
 }
 
+async function marcarPtacParcial(id, marcado) {
+  await api("atualizarCampoCaso", { id: id, campo: "parcial", valor: marcado ? "Sim" : "" });
+  await carregarCasos();
+  renderFicha();
+  renderBusca();
+}
+
 async function alterarEixoCaso(id, valor) {
   const c = casos.find(x => String(x.ID) === String(id));
   const nomes = { PTAC: "PTAC", Falencia: "Falência", Inventario: "Inventário" };
@@ -1586,6 +1593,7 @@ function renderBusca() {
           return txtH ? `<span style="font-weight:400;color:var(--texto-sec);font-size:12px">· ${txtH}</span>` : "";
         })()}</div>
         <div style="font-size:13px;font-weight:600;color:var(--verde-escuro);margin-top:3px">${linhaValor}</div>
+        ${c.PtacParcial === "Sim" ? `<div style="font-size:12px;font-weight:700;color:#b26a00;margin-top:2px">⚠ PTAC parcial</div>` : ""}
         ${(() => {
           // situacao da habilitacao: so para Falencia/Inventario ou casos ja em habilitacao
           if (eixoChave(c) === "ptac" && !casoDeHabilitacao(c)) return "";
@@ -1765,6 +1773,7 @@ async function renderFicha() {
         <a href="#" style="font-size:12.5px;color:var(--verde);text-decoration:underline" onclick="abrirModalHipotese('${c.ID}'); return false;">${c.HipoteseIncidencia ? "Alterar hipotese" : "Selecionar hipotese"}</a>
       </div>`}
       ${podeEncaminharPtac ? `<button class="btn-buscar" style="background:var(--laranja);margin-bottom:1rem" onclick="confirmarEncaminharPtac('${c.ID}','${c.Devedor.replace(/'/g,"\\'")}')">Encaminhar ao PTAC</button>` : ""}
+      ${(eixoChave(c) === "ptac" && !emHab) ? `<label style="display:flex;align-items:center;gap:8px;margin:0 0 1rem;font-size:14px;cursor:pointer"><input type="checkbox" style="width:auto" ${c.PtacParcial === "Sim" ? "checked" : ""} onchange="marcarPtacParcial('${c.ID}', this.checked)"> PTAC parcial <span style="color:var(--texto-sec);font-size:12.5px">(só parte da dívida entra no PTAC)</span></label>` : ""}
       <div class="field bloco bloco-importar">
         <label>Importar planilha de CDAs do Agilis (atualiza saldo, CDAs e execucoes deste devedor)</label>
         <input type="file" id="upload-cdas-${c.ID}" accept=".xlsx" onchange="processarUploadCDAs(event, '${c.ID}')">
@@ -2269,11 +2278,18 @@ function processarUploadCDAs(event, casoId) {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const linhas = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
       // Linhas 1-4 sao titulo/data de geracao/cabecalho; dados a partir da linha 5 (indice 4)
-      const dados = linhas.slice(4).filter(r => r[0] && String(r[0]).trim() !== "Total");
+      let dados = linhas.slice(4).filter(r => r[0] && String(r[0]).trim() !== "Total");
 
       const cdaInfo = {};
       const processosAtivos = new Set();
       let saldoTotal = 0;
+
+      // Regra do ISS: so vale quando o devedor tem apenas divida de ISS. Se houver IPTU, TMRSU ou outro tributo, as linhas de ISS sao descartadas.
+      const ehIss = r => /^ISS/i.test(String(r[1] || "").trim());
+      const temNaoIss = dados.some(r => String(r[1] || "").trim() !== "" && !ehIss(r));
+      const issIgnorado = temNaoIss ? dados.filter(ehIss) : [];
+      const dadosOrig = dados;
+      dados = temNaoIss ? dados.filter(r => !ehIss(r)) : dados;
 
       dados.forEach(r => {
         const numCda = String(r[0]).trim();
@@ -2315,7 +2331,9 @@ function processarUploadCDAs(event, casoId) {
       const sinalDiferenca = diferenca > 0 ? "+" : "";
 
       importPendente = { casoId, saldoTotal, numeroCDAs, numeroExecucoes, detalhamento };
-      preview.innerHTML = `Detectado: <b>${numeroCDAs} CDAs ativas</b> · <b>${numeroExecucoes} execucoes</b><br>
+      const nIssCdas = new Set(issIgnorado.map(r => String(r[0]).trim())).size;
+      const avisoIss = nIssCdas ? `<div style="margin-bottom:6px;color:#b26a00">ISS desconsiderado: ${nIssCdas} CDA(s) de ISS foram ignoradas porque o devedor tem outros tributos (só entra ISS quando é a única dívida).</div>` : "";
+      preview.innerHTML = avisoIss + `Detectado: <b>${numeroCDAs} CDAs ativas</b> · <b>${numeroExecucoes} execucoes</b><br>
         Saldo atual: <b>${fmt(saldoAtual)}</b> &rarr; Novo: <b>${fmt(saldoTotal)}</b>
         <span style="color:${corDiferenca}">(${sinalDiferenca}${fmt(diferenca)})</span>
         <div><button class="btn-submit" style="margin-top:8px;width:auto;padding:8px 16px" onclick="confirmarImportacaoCDAs()">Confirmar e salvar</button></div>`;
