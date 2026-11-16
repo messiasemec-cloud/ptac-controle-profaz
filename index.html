@@ -1295,6 +1295,17 @@ async function marcarPtacParcial(id, marcado) {
   renderBusca();
 }
 
+async function salvarJustParcial(id) {
+  const msg = document.getElementById("just-parcial-msg-" + id);
+  msg.textContent = "Salvando...";
+  const r = await api("atualizarCampoCaso", { id: id, campo: "justparcial", valor: document.getElementById("just-parcial-" + id).value.trim() });
+  if (r && r.erro) { msg.textContent = "Erro: " + r.erro + " (reimplante o Code.gs novo)"; return; }
+  await carregarCasos();
+  const m2 = document.getElementById("just-parcial-msg-" + id);
+  if (m2) m2.textContent = "Salvo.";
+  renderBusca();
+}
+
 async function alterarEixoCaso(id, valor) {
   const c = casos.find(x => String(x.ID) === String(id));
   const nomes = { PTAC: "PTAC", Falencia: "Falência", Inventario: "Inventário" };
@@ -1593,7 +1604,7 @@ function renderBusca() {
           return txtH ? `<span style="font-weight:400;color:var(--texto-sec);font-size:12px">· ${txtH}</span>` : "";
         })()}</div>
         <div style="font-size:13px;font-weight:600;color:var(--verde-escuro);margin-top:3px">${linhaValor}</div>
-        ${c.PtacParcial === "Sim" ? `<div style="font-size:12px;font-weight:700;color:#b26a00;margin-top:2px">⚠ PTAC parcial</div>` : ""}
+        ${c.PtacParcial === "Sim" ? `<div style="font-size:12px;font-weight:700;color:#b26a00;margin-top:2px">⚠ PTAC parcial${c.JustificativaPtacParcial ? ` <span style="font-weight:400">— ${escHtml(c.JustificativaPtacParcial)}</span>` : ""}</div>` : ""}
         ${(() => {
           // situacao da habilitacao: so para Falencia/Inventario ou casos ja em habilitacao
           if (eixoChave(c) === "ptac" && !casoDeHabilitacao(c)) return "";
@@ -1773,7 +1784,11 @@ async function renderFicha() {
         <a href="#" style="font-size:12.5px;color:var(--verde);text-decoration:underline" onclick="abrirModalHipotese('${c.ID}'); return false;">${c.HipoteseIncidencia ? "Alterar hipotese" : "Selecionar hipotese"}</a>
       </div>`}
       ${podeEncaminharPtac ? `<button class="btn-buscar" style="background:var(--laranja);margin-bottom:1rem" onclick="confirmarEncaminharPtac('${c.ID}','${c.Devedor.replace(/'/g,"\\'")}')">Encaminhar ao PTAC</button>` : ""}
-      ${(eixoChave(c) === "ptac" && !emHab) ? `<label style="display:flex;align-items:center;gap:8px;margin:0 0 1rem;font-size:14px;cursor:pointer"><input type="checkbox" style="width:auto" ${c.PtacParcial === "Sim" ? "checked" : ""} onchange="marcarPtacParcial('${c.ID}', this.checked)"> PTAC parcial <span style="color:var(--texto-sec);font-size:12.5px">(só parte da dívida entra no PTAC)</span></label>` : ""}
+      ${(eixoChave(c) === "ptac" && !emHab) ? `<div class="field" style="margin-bottom:1rem">
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" style="width:auto" ${c.PtacParcial === "Sim" ? "checked" : ""} onchange="marcarPtacParcial('${c.ID}', this.checked)"> PTAC parcial <span style="color:var(--texto-sec);font-size:12.5px">(só parte da dívida entra no PTAC)</span></label>
+        ${c.PtacParcial === "Sim" ? `<textarea id="just-parcial-${c.ID}" rows="2" maxlength="600" placeholder="Justificativa: por que o PTAC é parcial? (aparece no painel)" style="margin-top:6px">${escHtml(c.JustificativaPtacParcial || "")}</textarea>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:6px"><button type="button" class="btn-submit" style="width:auto;padding:6px 14px" onclick="salvarJustParcial('${c.ID}')">Salvar justificativa</button><span id="just-parcial-msg-${c.ID}" style="font-size:13px;color:var(--texto-sec)"></span></div>` : ""}
+      </div>` : ""}
       <div class="field bloco bloco-importar">
         <label>Importar planilha de CDAs do Agilis (atualiza saldo, CDAs e execucoes deste devedor)</label>
         <input type="file" id="upload-cdas-${c.ID}" accept=".xlsx" onchange="processarUploadCDAs(event, '${c.ID}')">
