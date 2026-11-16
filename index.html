@@ -1303,10 +1303,12 @@ function casoComSuspensao(c) {
   if (e === "falencia" || e === "inventario") return c.Status !== STATUS_HAB_INDEF;
   return e === "ptac" && c.Status !== "Em analise" && c.Status !== "Execucao retomada" && !casoDeHabilitacao(c);
 }
-const efPendentes = c => Math.max(0, (Number(c.efTotal) || 0) - (Number(c.efSuspensas) || 0));
+// total de EFs: a lista importada, ou (enquanto nao houver lista) o numero de execucoes do caso - tudo comeca pendente
+const efTot = c => (Number(c.efTotal) > 0 ? Number(c.efTotal) : (Number(c.NumeroExecucoesFiscais) || 0));
+const efPendentes = c => Math.max(0, efTot(c) - (Number(c.efSuspensas) || 0));
 
 function sufixoEFs(c) {
-  if (!casoComSuspensao(c) || !(Number(c.efTotal) > 0)) return "";
+  if (!casoComSuspensao(c) || !(efTot(c) > 0)) return "";
   const s = Number(c.efSuspensas) || 0, p = efPendentes(c);
   const cor = p > 0 ? "#b26a00" : "#2f7a47";
   return ` <span style="color:${cor}">(${s} suspensa${s === 1 ? "" : "s"} · ${p} pendente${p === 1 ? "" : "s"})</span>`;
@@ -1322,12 +1324,15 @@ function baixarPeticaoSuspensao(eixo) {
 function blocoEFsFicha(c) {
   if (!casoComSuspensao(c)) return "";
   const tot = Number(c.efTotal) || 0, susp = Number(c.efSuspensas) || 0;
-  const resumo = tot
-    ? `<b>${tot}</b> execuç${tot === 1 ? "ão" : "ões"} · <b style="color:#2f7a47">${susp} suspensa${susp === 1 ? "" : "s"}</b> · <b style="color:${efPendentes(c) ? "#b26a00" : "#2f7a47"}">${efPendentes(c)} pendente${efPendentes(c) === 1 ? "" : "s"}</b>`
+  const totEf = efTot(c);
+  const resumo = totEf
+    ? `<b>${totEf}</b> execuç${totEf === 1 ? "ão" : "ões"} · <b style="color:#2f7a47">${susp} suspensa${susp === 1 ? "" : "s"}</b> · <b style="color:${efPendentes(c) ? "#b26a00" : "#2f7a47"}">${efPendentes(c)} pendente${efPendentes(c) === 1 ? "" : "s"}</b>`
     : `Nenhuma EF listada ainda. Importe a planilha de CDAs do Ágilis para listar as execuções deste devedor.`;
+  const semLista = !tot && totEf > 0 ? `<div class="nota-campo" style="margin-bottom:4px">Todas as ${totEf} execuções começam como pendentes. Importe a planilha de CDAs do Ágilis para listar os números e ir marcando as suspensas.</div>` : "";
   return `<div class="field bloco bloco-hipotese" id="bloco-efs-${c.ID}">
     <label>Suspensão das execuções fiscais</label>
     <div style="font-size:13.5px;margin-bottom:6px">${resumo}</div>
+    ${semLista}
     <div class="nota-campo">Enquanto houver EF sem suspensão, o processo continua pendente. Marque a EF quando o juízo suspender o feito (movimento “Processo suspenso ou sobrestado…” no PJe).</div>
     <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:6px">
       ${(tot || c.efAusentes) ? `<a href="#" style="font-size:13px;color:var(--verde);text-decoration:underline" onclick="abrirModalEFs('${c.ID}'); return false;">Ver execuções fiscais (${tot})</a>` : ""}
