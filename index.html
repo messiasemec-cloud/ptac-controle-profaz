@@ -2458,11 +2458,16 @@ function processarUploadCDAs(event, casoId) {
       const processosAtivos = new Set();
       let saldoTotal = 0;
 
-      // Regra do ISS: so vale quando o devedor tem apenas divida de ISS. Se houver IPTU, TMRSU ou outro tributo, as linhas de ISS sao descartadas.
+      // Regras de quais linhas entram:
+      // 1) multas (PROCON, AGEFIS etc. - credito nao tributario) nunca entram;
+      // 2) ISS (qualquer tipo: Empresa, Substituto tributario...) so entra quando e a unica divida tributaria do devedor;
+      //    se houver IPTU, TMRSU ou outro tributo, as linhas de ISS sao descartadas.
+      const ehMulta = r => /^MULTA/i.test(String(r[1] || "").trim());
       const ehIss = r => /^ISS/i.test(String(r[1] || "").trim());
+      const multaIgnorada = dados.filter(ehMulta);
+      dados = dados.filter(r => !ehMulta(r));
       const temNaoIss = dados.some(r => String(r[1] || "").trim() !== "" && !ehIss(r));
       const issIgnorado = temNaoIss ? dados.filter(ehIss) : [];
-      const dadosOrig = dados;
       dados = temNaoIss ? dados.filter(r => !ehIss(r)) : dados;
 
       dados.forEach(r => {
@@ -2506,8 +2511,10 @@ function processarUploadCDAs(event, casoId) {
 
       importPendente = { casoId, saldoTotal, numeroCDAs, numeroExecucoes, detalhamento, processos: [...processosAtivos] };
       const nIssCdas = new Set(issIgnorado.map(r => String(r[0]).trim())).size;
+      const nMultaCdas = new Set(multaIgnorada.map(r => String(r[0]).trim())).size;
+      const avisoMulta = nMultaCdas ? `<div style="margin-bottom:6px;color:#b26a00">Multas desconsideradas: ${nMultaCdas} CDA(s) de multa (PROCON/outras) não entram no PTAC.</div>` : "";
       const avisoIss = nIssCdas ? `<div style="margin-bottom:6px;color:#b26a00">ISS desconsiderado: ${nIssCdas} CDA(s) de ISS foram ignoradas porque o devedor tem outros tributos (só entra ISS quando é a única dívida).</div>` : "";
-      preview.innerHTML = avisoIss + `Detectado: <b>${numeroCDAs} CDAs ativas</b> · <b>${numeroExecucoes} execucoes</b><br>
+      preview.innerHTML = avisoMulta + avisoIss + `Detectado: <b>${numeroCDAs} CDAs ativas</b> · <b>${numeroExecucoes} execucoes</b><br>
         Saldo atual: <b>${fmt(saldoAtual)}</b> &rarr; Novo: <b>${fmt(saldoTotal)}</b>
         <span style="color:${corDiferenca}">(${sinalDiferenca}${fmt(diferenca)})</span>
         <div><button class="btn-submit" style="margin-top:8px;width:auto;padding:8px 16px" onclick="confirmarImportacaoCDAs()">Confirmar e salvar</button></div>`;
