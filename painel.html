@@ -592,10 +592,15 @@ function dataIsoBR(iso) {
   return m ? m[3] + "/" + m[2] + "/" + m[1] : "";
 }
 
+function linkEFsHtml(d) {
+  const t = Number(d.efTotal) || 0;
+  return t ? `<div class="fase-datas"><a href="#" class="link-efs" data-caso="${esc(d.casoId)}" style="color:var(--verde);text-decoration:underline">Ver situação das execuções fiscais (${t})</a></div>` : "";
+}
+
 function barraFasesHtml(d) {
   const status = d.status === "Concluido/Extinto" ? "Concluido" : d.status;
   const idx = ETAPAS_PTAC.indexOf(status);
-  if (idx < 0) return `<div class="fase-datas">Fase atual: ${esc(status || "—")}</div>`;
+  if (idx < 0) return `<div class="fase-datas">Fase atual: ${esc(status || "—")}</div>` + linkEFsHtml(d);
   const encerrado = status === "Concluido";
   const feitas = (d.homologacao ? 1 : 0) + (d.aprovacao ? 1 : 0);
   let h = '<div class="fases">';
@@ -610,7 +615,7 @@ function barraFasesHtml(d) {
   if (d.dataInstauracao) datas.push("Instaurado em " + dataIsoBR(d.dataInstauracao));
   if (d.homologacao) datas.push("Homologação da chefia em " + dataIsoBR(d.homologacao));
   if (d.aprovacao) datas.push("Aprovação final em " + dataIsoBR(d.aprovacao));
-  return h + (datas.length ? `<div class="fase-datas">${datas.map(esc).join(" · ")}</div>` : "");
+  return h + (datas.length ? `<div class="fase-datas">${datas.map(esc).join(" · ")}</div>` : "") + linkEFsHtml(d);
 }
 
 const ETAPAS_HAB = ["Em analise", "Habilitacao em andamento", "Habilitado"];
@@ -631,7 +636,7 @@ function barraHabHtml(d) {
         ? "Execução fiscal suspensa até o encerramento da falência (Portaria 53/2026-GPG, art. 2º, §1º). Novos ajuizamentos são interrompidos (art. 4º); créditos constituídos depois entram por nova habilitação ou aditamento (art. 4º, §1º)."
         : "Execução fiscal suspensa até o encerramento do inventário (Portaria 53/2026-GPG, art. 3º, §1º). Novos ajuizamentos são interrompidos (art. 4º); créditos constituídos depois entram por nova habilitação ou aditamento (art. 4º, §1º).")
     : `Crédito apto à habilitação: o procurador requer a suspensão da execução fiscal e comunica a Chefia da PROFAZ para as providências de habilitação (Portaria 53/2026-GPG, art. ${falencia ? "2º, II" : "3º, II"}).`;
-  return h + `<div class="regra-hab">${esc(regra)}</div>`;
+  return h + `<div class="regra-hab">${esc(regra)}</div>` + linkEFsHtml(d);
 }
 
 function linhaHab(d, etiqueta) {
@@ -669,7 +674,7 @@ function sufixoEFs(d) {
   const t = Number(d.efTotal) || 0;
   if (!t) return "";
   const s = Number(d.efSuspensas) || 0, pd = Number(d.efPedidos) || 0, pe = t - s - pd;
-  return ` <span style="color:${(t - s) ? "#b26a00" : "#2f7a47"}">(${s} suspensa${s === 1 ? "" : "s"}${pd ? ` · ${pd} com pedido` : ""} · ${pe} pendente${pe === 1 ? "" : "s"})</span>`;
+  return ` (<span style="color:#7a52a8">${s} suspensa${s === 1 ? "" : "s"}</span>${pd ? ` · <span style="color:#b26a00">${pd} com pedido</span>` : ""} · <span style="color:#c0392b">${pe} pendente${pe === 1 ? "" : "s"}</span>)`;
 }
 
 function linhaHtml(d, etiqueta) {
@@ -692,8 +697,71 @@ function linhaHtml(d, etiqueta) {
   </div>`;
 }
 
+/* ---------------- Situacao das execucoes fiscais (somente leitura) ---------------- */
+const ETAPAS_EF = [
+  { v: "", rot: "Pendente", cor: "#c0392b" },
+  { v: "Pedido", rot: "Pedido protocolado", cor: "#b26a00" },
+  { v: "Sim", rot: "Suspensa", cor: "#7a52a8" }
+];
+function trilhaEF(sit) {
+  const atual = Math.max(0, ETAPAS_EF.findIndex(e => e.v === sit));
+  const cor = ETAPAS_EF[atual].cor;
+  return '<div style="display:flex;align-items:flex-start">' + ETAPAS_EF.map((e, k) => {
+    const feito = k <= atual;
+    const linha = k > 0 ? `<div style="width:26px;height:2px;margin-top:8px;background:${feito ? cor : "#d9dfdd"}"></div>` : "";
+    return linha + `<div style="display:flex;flex-direction:column;align-items:center;width:78px">
+      <span style="width:18px;height:18px;border-radius:50%;box-sizing:border-box;border:2px solid ${feito ? cor : "#d9dfdd"};background:${feito ? cor : "#fff"};color:#fff;font-size:11px;line-height:14px;text-align:center">${k < atual ? "&#10003;" : ""}</span>
+      <span style="font-size:10.5px;margin-top:2px;text-align:center;line-height:1.1;color:${k === atual ? cor : "#6b7a76"};font-weight:${k === atual ? 700 : 400}">${e.rot}</span></div>`;
+  }).join("") + "</div>";
+}
+let efsPainelPagina = 50;
+function fecharEFs() { const m = document.getElementById("modal-efs-painel"); if (m) m.remove(); document.removeEventListener("keydown", teclaEFs); }
+function teclaEFs(ev) { if (ev.key === "Escape") fecharEFs(); }
+async function abrirEFs(d) {
+  fecharEFs();
+  efsPainelPagina = 50;
+  const m = document.createElement("div");
+  m.id = "modal-efs-painel";
+  m.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:300;padding:16px";
+  m.innerHTML = `<div style="background:#fff;border-radius:14px;padding:20px;max-width:640px;width:100%;max-height:85vh;overflow:auto" role="dialog" aria-modal="true"><div id="efs-painel-corpo">Carregando…</div></div>`;
+  m.addEventListener("click", ev => { if (ev.target === m) fecharEFs(); });
+  document.body.appendChild(m);
+  document.addEventListener("keydown", teclaEFs);
+  let lista = [];
+  try { const r = await api("listarEFsPainel", { casoId: d.casoId }); lista = Array.isArray(r) ? r : []; } catch (e) { lista = null; }
+  desenharEFsPainel(d, lista);
+}
+function desenharEFsPainel(d, lista) {
+  const corpo = document.getElementById("efs-painel-corpo");
+  if (!corpo) return;
+  const fechar = '<button type="button" onclick="fecharEFs()" style="border:1.5px solid #d9dfdd;background:#fff;border-radius:8px;padding:5px 12px;cursor:pointer;font:inherit">Fechar</button>';
+  const cab = `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px"><div><div style="font-weight:700;font-size:16px">Execuções fiscais — ${esc(d.devedor)}</div>`;
+  if (!lista || !lista.length) {
+    corpo.innerHTML = cab + `<div style="font-size:12.5px;color:#6b7a76">${lista ? "A lista de execuções deste devedor ainda não foi cadastrada." : "Não foi possível carregar a lista."}</div></div>${fechar}</div>`;
+    return;
+  }
+  const s = lista.filter(x => x.situacao === "Sim").length, pd = lista.filter(x => x.situacao === "Pedido").length, pe = lista.length - s - pd;
+  const br = x => dataIsoBR(x);
+  corpo.innerHTML = cab + `<div style="font-size:12.5px;color:#6b7a76">${lista.length} execuções · <b style="color:#7a52a8">${s} suspensas</b> · <b style="color:#b26a00">${pd} com pedido protocolado</b> · <b style="color:#c0392b">${pe} pendentes</b></div></div>${fechar}</div>
+    <div style="border:1px solid #d9dfdd;border-radius:8px;padding:6px 10px">` +
+    lista.slice(0, efsPainelPagina).map(x => `<div style="display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 0">
+      <span style="font-variant-numeric:tabular-nums;flex:1">${esc(x.processo)}</span>
+      ${x.situacao && x.data ? `<span style="color:#6b7a76;font-size:12px">${x.situacao === "Sim" ? "suspensa" : "pedido"} em ${br(x.data)}</span>` : ""}
+      ${trilhaEF(x.situacao || "")}</div>`).join("") +
+    (lista.length > efsPainelPagina ? `<a href="#" id="efs-mais" style="font-size:13px;color:var(--verde)">Mostrar mais (${lista.length - efsPainelPagina} restantes)</a>` : "") + "</div>";
+  const mais = document.getElementById("efs-mais");
+  if (mais) mais.onclick = ev => { ev.preventDefault(); efsPainelPagina += 50; desenharEFsPainel(d, lista); };
+}
+
 /* ---------------- Visualizar parecer ---------------- */
 function cliqueLista(ev) {
+  const linkEf = ev.target.closest(".link-efs");
+  if (linkEf) {
+    ev.preventDefault();
+    const dd = devedores.find(x => String(x.casoId) === linkEf.dataset.caso) || habilitacoes.find(x => String(x.casoId) === linkEf.dataset.caso);
+    if (dd) abrirEFs(dd);
+    return;
+  }
   const botao = ev.target.closest(".btn-parecer");
   if (botao) {
     const d = devedores.find(x => String(x.casoId) === botao.dataset.caso) || habilitacoes.find(x => String(x.casoId) === botao.dataset.caso);
