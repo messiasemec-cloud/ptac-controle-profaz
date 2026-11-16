@@ -644,7 +644,7 @@ function linhaHab(d, etiqueta) {
   if (d.ef) partes.push("EF: " + esc(d.ef));
   if (d.valor !== null && d.valor !== undefined) partes.push((d.status === "Habilitado" ? "Valor habilitado: " : "Valor da habilitação: ") + fmt(d.valor) + (d.dataBase ? " em " + dataIsoBR(d.dataBase) : ""));
   const sal = Number(d.saldo) || 0;
-  const linhaSaldo = `Saldo devedor atual: ${fmt(sal)} · ${plural(Number(d.execucoes) || 0, "execução", "execuções")} · ${plural(Number(d.cdas) || 0, "CDA", "CDAs")}`
+  const linhaSaldo = `Saldo devedor atual: ${fmt(sal)} · ${plural(Number(d.execucoes) || 0, "execução", "execuções")}${sufixoEFs(d)} · ${plural(Number(d.cdas) || 0, "CDA", "CDAs")}`
     + ((d.valor !== null && d.valor !== undefined && sal > d.valor + 0.005) ? ` · <b style="color:#b26a00">${fmt(sal - d.valor)} acima do habilitado (a conferir)</b>` : "");
   const etq = etiqueta ? `<span class="etq hab">${d.eixo === "falencia" ? "Falência" : "Inventário"}</span>` : "";
   const nPar = d.pareceres.length;
@@ -665,6 +665,13 @@ function linhaHab(d, etiqueta) {
   </div>`;
 }
 
+function sufixoEFs(d) {
+  const t = Number(d.efTotal) || 0;
+  if (!t) return "";
+  const s = Number(d.efSuspensas) || 0, pe = t - s;
+  return ` <span style="color:${pe ? "#b26a00" : "#2f7a47"}">(${s} suspensa${s === 1 ? "" : "s"} · ${pe} pendente${pe === 1 ? "" : "s"})</span>`;
+}
+
 function linhaHtml(d, etiqueta) {
   const h = citacao(d.hipotese);
   const n = d.pareceres.length;
@@ -677,7 +684,7 @@ function linhaHtml(d, etiqueta) {
     <div class="avatar">${esc(iniciais(d.devedor))}</div>
     <div class="linha-corpo">
       <div class="linha-nome">${etiqueta ? '<span class="etq">PTAC</span>' : ""}${esc(d.devedor)} <span>${d.documento ? "- " + esc(d.documento) : ""} · ${h ? esc(h) : "Hipótese não informada"}</span></div>
-      <div class="linha-valores">${fmt(d.saldo)} · ${plural(Number(d.execucoes) || 0, "execução", "execuções")} · ${plural(Number(d.cdas) || 0, "CDA", "CDAs")}${d.parcial ? ' · <b style="color:#b26a00">⚠ PTAC parcial</b>' : ""}</div>${d.parcial && d.justParcial ? `<div class="linha-valores" style="color:#b26a00;font-weight:500;font-size:12.5px">Parcial: ${esc(d.justParcial)}</div>` : ""}
+      <div class="linha-valores">${fmt(d.saldo)} · ${plural(Number(d.execucoes) || 0, "execução", "execuções")}${sufixoEFs(d)} · ${plural(Number(d.cdas) || 0, "CDA", "CDAs")}${d.parcial ? ' · <b style="color:#b26a00">⚠ PTAC parcial</b>' : ""}</div>${d.parcial && d.justParcial ? `<div class="linha-valores" style="color:#b26a00;font-weight:500;font-size:12.5px">Parcial: ${esc(d.justParcial)}</div>` : ""}
     </div>
     <div class="linha-lado">${selo(d.status, d)}${botao}<span class="seta" aria-hidden="true">&#9660;</span></div>
   </div>
