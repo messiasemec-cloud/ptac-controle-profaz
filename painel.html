@@ -728,7 +728,12 @@ async function abrirEFs(d) {
   document.body.appendChild(m);
   document.addEventListener("keydown", teclaEFs);
   let lista = [];
-  try { const r = await api("listarEFsPainel", { casoId: d.casoId }); lista = Array.isArray(r) ? r : []; } catch (e) { lista = null; }
+  try {
+    let r = await api("listarEFsPainel", { casoId: d.casoId });
+    // Code.gs sem a acao nova do painel: usa a acao antiga (mesma lista) e tira as EFs que sairam da planilha
+    if (!Array.isArray(r)) r = await api("listarEFs", { casoId: d.casoId });
+    lista = Array.isArray(r) ? r.filter(x => !x.ausente).map(x => ({ processo: x.processo, situacao: x.situacao || (x.suspensa ? "Sim" : ""), data: x.data })) : null;
+  } catch (e) { lista = null; }
   desenharEFsPainel(d, lista);
 }
 function desenharEFsPainel(d, lista) {
@@ -737,7 +742,7 @@ function desenharEFsPainel(d, lista) {
   const fechar = '<button type="button" onclick="fecharEFs()" style="border:1.5px solid #d9dfdd;background:#fff;border-radius:8px;padding:5px 12px;cursor:pointer;font:inherit">Fechar</button>';
   const cab = `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px"><div><div style="font-weight:700;font-size:16px">Execuções fiscais — ${esc(d.devedor)}</div>`;
   if (!lista || !lista.length) {
-    corpo.innerHTML = cab + `<div style="font-size:12.5px;color:#6b7a76">${lista ? "A lista de execuções deste devedor ainda não foi cadastrada." : "Não foi possível carregar a lista."}</div></div>${fechar}</div>`;
+    corpo.innerHTML = cab + `<div style="font-size:12.5px;color:#6b7a76">${lista ? "A lista de execuções deste devedor ainda não foi cadastrada." : "Não foi possível carregar a lista (o servidor Code.gs pode estar desatualizado)."}</div></div>${fechar}</div>`;
     return;
   }
   const s = lista.filter(x => x.situacao === "Sim").length, pd = lista.filter(x => x.situacao === "Pedido").length, pe = lista.length - s - pd;
