@@ -1723,11 +1723,10 @@ const ABAS_EIXO = [
   { chave: "hab", rotulo: "Habilitações" }
 ];
 const ABAS_HAB = [
-  { chave: "", rotulo: "Todas" },
   { chave: "inventario", rotulo: "Inventário" },
   { chave: "falencia", rotulo: "Falência" }
 ];
-let filtroHabSub = "";
+let filtroHabSub = ""; // "" = inventario e falencia juntos
 const ehHabEixo = c => eixoChave(c) !== "ptac"; // Falencia e Inventario = habilitacoes (so criterio de classificacao)
 function escolherAbaEixo(chave) {
   filtroEixoAndamento = chave;
@@ -1736,7 +1735,7 @@ function escolherAbaEixo(chave) {
   renderBusca();
 }
 function escolherSubHab(chave) {
-  filtroHabSub = chave;
+  filtroHabSub = (filtroHabSub === chave) ? "" : chave; // clicar de novo no marcado volta a mostrar os dois
   listaFocoId = null;
   renderBusca();
 }
@@ -1744,20 +1743,16 @@ function renderAbasEixo() {
   const alvo = document.getElementById("abas-eixo");
   if (!alvo) return;
   const contar = ch => ch === "" ? casos.length : (ch === "ptac" ? casos.filter(c => eixoChave(c) === "ptac").length : casos.filter(ehHabEixo).length);
-  alvo.innerHTML = ABAS_EIXO.map(a => {
-    const ativa = filtroEixoAndamento === a.chave;
-    return `<button type="button" class="aba-eixo${ativa ? " ativa" : ""}" role="tab" aria-selected="${ativa}" onclick="escolherAbaEixo('${a.chave}')">${a.rotulo}<span class="qtd">${contar(a.chave)}</span></button>`;
+  const botao = a => `<button type="button" class="aba-eixo${filtroEixoAndamento === a.chave ? " ativa" : ""}" role="tab" aria-selected="${filtroEixoAndamento === a.chave}" onclick="escolherAbaEixo('${a.chave}')">${a.rotulo}<span class="qtd">${contar(a.chave)}</span></button>`;
+  const subs = ABAS_HAB.map(a => {
+    const n = casos.filter(c => eixoChave(c) === a.chave).length;
+    const ativa = filtroHabSub === a.chave;
+    return `<button type="button" class="aba-eixo${ativa ? " ativa" : ""}" style="padding:4px 11px;font-size:12.5px" onclick="escolherSubHab('${a.chave}')">${a.rotulo}<span class="qtd">${n}</span></button>`;
   }).join("");
-  const sub = document.getElementById("abas-hab");
-  if (sub) {
-    if (filtroEixoAndamento !== "hab") { sub.innerHTML = ""; sub.style.display = "none"; return; }
-    sub.style.display = "flex";
-    sub.innerHTML = ABAS_HAB.map(a => {
-      const n = a.chave ? casos.filter(c => eixoChave(c) === a.chave).length : casos.filter(ehHabEixo).length;
-      const ativa = filtroHabSub === a.chave;
-      return `<button type="button" class="aba-eixo${ativa ? " ativa" : ""}" style="padding:5px 12px;font-size:13px" onclick="escolherSubHab('${a.chave}')">${a.rotulo}<span class="qtd">${n}</span></button>`;
-    }).join("");
-  }
+  alvo.style.alignItems = "flex-start";
+  alvo.innerHTML = ABAS_EIXO.map(a => a.chave === "hab"
+    ? `<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">${botao(a)}${filtroEixoAndamento === "hab" ? `<div style="display:flex;gap:6px;flex-wrap:wrap;padding-left:10px">${subs}</div>` : ""}</div>`
+    : botao(a)).join("");
 }
 
 function renderBusca() {

@@ -223,7 +223,7 @@ const ICONE_DOC = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" s
 let devedores = [];
 let habilitacoes = [];
 let abaSel = "ptac";   // "ptac" | "hab" (habilitacoes: inventario + falencia)
-let habSub = "todas";  // "todas" | "inventario" | "falencia"
+let habSub = "";  // "" = inventario e falencia juntos | "inventario" | "falencia"
 let limiteLista = 50;
 let resumo = null;
 let carregado = false;
@@ -475,28 +475,20 @@ function renderContribuintes() {
   if (!devedores.length && !habilitacoes.length) { app.innerHTML = (servidorDesatualizado ? AVISO_VERSAO : "") + `<div class="card estado">Nenhum caso cadastrado ainda.</div>`; return; }
   const nInv = habilitacoes.filter(h => h.eixo === "inventario").length;
   const nFal = habilitacoes.filter(h => h.eixo === "falencia").length;
-  const sub = (chave, rotulo, n, atual, attr) => `<button class="subaba${atual === chave ? " ativa" : ""}" ${attr}="${chave}" aria-pressed="${atual === chave}">${rotulo}<span class="qtd">${n}</span></button>`;
-  const sub2 = abaSel === "hab"
-    ? `<div class="subabas" id="subabas2" style="margin-top:-4px">${sub("todas", "Todas", habilitacoes.length, habSub, "data-sub")}${sub("inventario", "Inventário", nInv, habSub, "data-sub")}${sub("falencia", "Falência", nFal, habSub, "data-sub")}</div>`
+  const sub = (chave, rotulo, n, atual, attr, extra) => `<button class="subaba${atual === chave ? " ativa" : ""}" ${attr}="${chave}" aria-pressed="${atual === chave}" ${extra || ""}>${rotulo}<span class="qtd">${n}</span></button>`;
+  const subsHab = abaSel === "hab"
+    ? `<div style="display:flex;gap:6px;flex-wrap:wrap;padding-left:10px">${sub("inventario", "Inventário", nInv, habSub, "data-sub", 'style="padding:6px 12px;font-size:13px"')}${sub("falencia", "Falência", nFal, habSub, "data-sub", 'style="padding:6px 12px;font-size:13px"')}</div>`
     : "";
   app.innerHTML = (servidorDesatualizado ? AVISO_VERSAO : "") + `
-    <div class="subabas" id="subabas">${sub("ptac", "PTAC", devedores.length, abaSel, "data-aba")}${sub("hab", "Habilitações", habilitacoes.length, abaSel, "data-aba")}</div>
-    ${sub2}
+    <div class="subabas" id="subabas" style="align-items:flex-start">${sub("ptac", "PTAC", devedores.length, abaSel, "data-aba")}<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">${sub("hab", "Habilitações", habilitacoes.length, abaSel, "data-aba")}${subsHab}</div></div>
     <input class="busca" id="busca" type="search" placeholder="Buscar em todas as abas por nome ou CPF/CNPJ" value="${esc(busca)}" autocomplete="off" style="margin-bottom:1rem">
     <div id="area"></div>`;
 
   document.getElementById("subabas").addEventListener("click", ev => {
     const b = ev.target.closest(".subaba");
     if (!b) return;
-    abaSel = b.dataset.aba;
-    limiteLista = 50;
-    renderContribuintes();
-  });
-  const s2 = document.getElementById("subabas2");
-  if (s2) s2.addEventListener("click", ev => {
-    const b = ev.target.closest(".subaba");
-    if (!b) return;
-    habSub = b.dataset.sub;
+    if (b.dataset.sub !== undefined) habSub = (habSub === b.dataset.sub) ? "" : b.dataset.sub; // clicar de novo no marcado volta a mostrar os dois
+    else abaSel = b.dataset.aba;
     limiteLista = 50;
     renderContribuintes();
   });
@@ -520,7 +512,7 @@ function renderArea() {
   const area = document.getElementById("area");
   if (normaliza(busca).trim()) { renderBuscaGeral(area); return; }
   if (abaSel === "ptac") { renderAreaPtac(area); return; }
-  renderAreaHab(area, habSub);
+  renderAreaHab(area, habSub || "todas");
 }
 
 function botaoMais(restantes) {
