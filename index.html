@@ -1306,12 +1306,24 @@ function casoComSuspensao(c) {
 }
 // total de EFs: a lista importada, ou (enquanto nao houver lista) o numero de execucoes do caso - tudo comeca pendente
 const efTot = c => (Number(c.efTotal) > 0 ? Number(c.efTotal) : (Number(c.NumeroExecucoesFiscais) || 0));
-const efPendentes = c => Math.max(0, efTot(c) - (Number(c.efSuspensas) || 0));
+// pendentes = tudo que ainda exige providencia (pendentes + com pedido); "nao se aplica" e suspensas estao resolvidas
+const efPendentes = c => Math.max(0, efTot(c) - (Number(c.efSuspensas) || 0) - (Number(c.efNaoAplica) || 0));
+
+// monta "x suspensas · y com pedido · z pendentes · w nao se aplicam"; tudo verde quando nada mais exige providencia
+function resumoEFsHtml(s, pe, p, na, tag) {
+  const resolvido = pe === 0 && p === 0;
+  const V = "#5a9e2f", L = "#b26a00", R = "#c0392b", C = "#6b7a76";
+  const seg = [`<${tag} style="color:${V}">${s} suspensa${s === 1 ? "" : "s"}</${tag}>`];
+  if (pe) seg.push(`<${tag} style="color:${L}">${pe} com pedido${tag === "b" ? " protocolado" : ""}</${tag}>`);
+  if (p || !resolvido) seg.push(`<${tag} style="color:${R}">${p} pendente${p === 1 ? "" : "s"}</${tag}>`);
+  if (na) seg.push(`<${tag} style="color:${C}">${na} não se aplica${na === 1 ? "" : "m"}</${tag}>`);
+  return seg.join(" · ") + (resolvido ? ` <${tag} style="color:${V}">✓</${tag}>` : "");
+}
 
 function sufixoEFs(c) {
   if (!casoComSuspensao(c) || !(efTot(c) > 0)) return "";
-  const s = Number(c.efSuspensas) || 0, pe = Number(c.efPedidos) || 0, p = efPendentes(c) - pe;
-  return ` (<span style="color:#5a9e2f">${s} suspensa${s === 1 ? "" : "s"}</span>${pe ? ` · <span style="color:#b26a00">${pe} com pedido</span>` : ""} · <span style="color:#c0392b">${p} pendente${p === 1 ? "" : "s"}</span>)`;
+  const s = Number(c.efSuspensas) || 0, pe = Number(c.efPedidos) || 0, na = Number(c.efNaoAplica) || 0, p = efPendentes(c) - pe;
+  return ` (${resumoEFsHtml(s, pe, p, na, "span")})`;
 }
 
 function baixarPeticaoSuspensao(eixo) {
@@ -1325,9 +1337,9 @@ function blocoEFsFicha(c) {
   if (!casoComSuspensao(c)) return "";
   const tot = Number(c.efTotal) || 0, susp = Number(c.efSuspensas) || 0;
   const totEf = efTot(c);
-  const ped = Number(c.efPedidos) || 0, pendSo = efPendentes(c) - ped;
+  const ped = Number(c.efPedidos) || 0, pendSo = efPendentes(c) - ped, naoAp = Number(c.efNaoAplica) || 0;
   const resumo = totEf
-    ? `<b>${totEf}</b> execuç${totEf === 1 ? "ão" : "ões"} · <b style="color:#5a9e2f">${susp} suspensa${susp === 1 ? "" : "s"}</b>${ped ? ` · <b style="color:#b26a00">${ped} com pedido protocolado</b>` : ""} · <b style="color:#c0392b">${pendSo} pendente${pendSo === 1 ? "" : "s"}</b>`
+    ? `<b>${totEf}</b> execuç${totEf === 1 ? "ão" : "ões"} · ${resumoEFsHtml(susp, ped, pendSo, naoAp, "b")}`
     : `Nenhuma EF listada ainda. Importe a planilha de CDAs do Ágilis para listar as execuções deste devedor.`;
   const semLista = !tot && totEf > 0 ? `<div class="nota-campo" style="margin-bottom:4px">Todas as ${totEf} execuções começam como pendentes. Importe a planilha de CDAs do Ágilis para listar os números e ir marcando as suspensas.</div>` : "";
   return `<div class="field bloco bloco-hipotese" id="bloco-efs-${c.ID}">
@@ -1375,12 +1387,13 @@ function desenharEFs(casoId, mais) {
   const limite = efsPagina[casoId] || EF_POR_PAGINA;
   const susp = ativas.filter(o => o.x.situacao === "Sim" || o.x.suspensa).length;
   const ped = ativas.filter(o => o.x.situacao === "Pedido").length;
-  const pend = ativas.length - susp - ped;
-  const naoSusp = ativas.length - susp;
+  const na = ativas.filter(o => o.x.situacao === "NaoAplica").length;
+  const pend = ativas.length - susp - ped - na;
+  const naoSusp = ativas.length - susp - na;
   const br = d => String(d).slice(0, 10).split("-").reverse().join("/");
   alvo.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
       <div><div class="modal-titulo">Execuções fiscais — ${escHtml(c.Devedor || "")}</div>
-      <div class="modal-sub">${ativas.length} execuções · <b style="color:#5a9e2f">${susp} suspensas</b> · <b style="color:#b26a00">${ped} com pedido protocolado</b> · <b style="color:#c0392b">${pend} pendentes</b></div></div>
+      <div class="modal-sub">${ativas.length} execuções · ${resumoEFsHtml(susp, ped, pend, na, "b")}</div></div>
       <button type="button" class="btn-submit" style="width:auto;padding:5px 12px;background:var(--branco);color:var(--texto);border:1.5px solid var(--cinza-borda)" onclick="fecharModalEFs()">Fechar</button>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">
@@ -1392,8 +1405,8 @@ function desenharEFs(casoId, mais) {
     <div style="max-height:46vh;overflow:auto;border:1px solid var(--cinza-borda);border-radius:8px;padding:6px 10px">
     ${ativas.slice(0, limite).map(o => { const sit = o.x.situacao || (o.x.suspensa ? "Sim" : ""); return `<div style="display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 0">
         <span style="font-variant-numeric:tabular-nums;flex:1">${escHtml(o.x.processo)}</span>
-        ${sit && o.x.data ? `<span style="color:var(--texto-sec);font-size:12px">${sit === "Sim" ? "suspensa" : "pedido"} em ${br(o.x.data)}</span>` : ""}
-        ${trilhaEF(casoId, o.i, sit)}
+        ${sit === "NaoAplica" ? `<span style="color:var(--texto-sec);font-size:12px">${escHtml(o.x.motivo || "")}</span>` : (sit && o.x.data ? `<span style="color:var(--texto-sec);font-size:12px">${sit === "Sim" ? "suspensa" : "pedido"} em ${br(o.x.data)}</span>` : "")}
+        ${trilhaEF(casoId, o.i, sit, o.x.motivo)}
       </div>`; }).join("") || '<div style="font-size:13px;color:var(--texto-sec)">Nenhuma EF ativa listada.</div>'}
     ${ativas.length > limite ? `<a href="#" style="font-size:13px;color:var(--verde)" onclick="desenharEFs('${casoId}', true); return false;">Mostrar mais (${ativas.length - limite} restantes)</a>` : ""}
     </div>
@@ -1424,24 +1437,44 @@ const ETAPAS_EF = [
   { v: "Pedido", rot: "Pedido protocolado", cor: "#b26a00" },
   { v: "Sim", rot: "Suspensa", cor: "#5a9e2f" }
 ];
-function trilhaEF(casoId, i, sit) {
-  const atual = Math.max(0, ETAPAS_EF.findIndex(e => e.v === sit));
-  return `<div style="display:flex;align-items:flex-start">` + ETAPAS_EF.map((e, k) => {
-    const feito = k <= atual, cor = ETAPAS_EF[atual].cor;
+function trilhaEF(casoId, i, sit, motivo) {
+  const naoAp = sit === "NaoAplica";
+  const atual = naoAp ? -1 : Math.max(0, ETAPAS_EF.findIndex(e => e.v === sit));
+  const cor = atual >= 0 ? ETAPAS_EF[atual].cor : "#9aa5a1";
+  const dots = `<div style="display:flex;align-items:flex-start">` + ETAPAS_EF.map((e, k) => {
+    const feito = k <= atual;
     const linha = k > 0 ? `<div style="width:26px;height:2px;margin-top:8px;background:${k <= atual ? cor : "var(--cinza-borda)"}"></div>` : "";
     return linha + `<button type="button" title="${e.rot}" aria-label="${e.rot}" onclick="marcarEF('${casoId}', ${i}, '${e.v}')" style="all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;width:78px">
       <span style="width:18px;height:18px;border-radius:50%;box-sizing:border-box;border:2px solid ${feito ? cor : "var(--cinza-borda)"};background:${k === atual ? cor : (feito ? cor : "var(--branco)")};color:#fff;font-size:11px;line-height:14px;text-align:center">${k < atual ? "&#10003;" : ""}</span>
       <span style="font-size:10.5px;margin-top:2px;text-align:center;line-height:1.1;color:${k === atual ? cor : "var(--texto-sec)"};font-weight:${k === atual ? 700 : 400}">${e.rot}</span>
     </button>`;
   }).join("") + `</div>`;
+  // "Nao se aplica" fica fora da sequencia (nao e uma etapa): arquivada definitivamente, extinta etc.
+  const chip = `<button type="button" title="${naoAp ? "Clique para desmarcar" : "Marcar como não se aplica (arquivada, extinta...)"}" onclick="marcarNaoAplica('${casoId}', ${i})" style="cursor:pointer;margin-left:10px;align-self:flex-start;border-radius:12px;padding:2px 9px;font:inherit;font-size:11.5px;border:1.5px solid ${naoAp ? "#6b7a76" : "var(--cinza-borda)"};background:${naoAp ? "#6b7a76" : "var(--branco)"};color:${naoAp ? "#fff" : "var(--texto-sec)"}">Não se aplica</button>`;
+  return `<div style="display:flex;align-items:flex-start">${dots}${chip}</div>`;
 }
 
-async function marcarEF(casoId, i, situacao) {
+async function marcarNaoAplica(casoId, i) {
+  const x = efsCache[casoId][i];
+  if (x.situacao === "NaoAplica") { await marcarEF(casoId, i, ""); return; } // desmarca
+  const op = prompt("Por que não se aplica?\n\n1 = Arquivada definitivamente\n2 = Extinta\n3 = Baixada\n4 = Outro (você descreve)\n\nDigite 1, 2, 3 ou 4:");
+  if (op === null) return;
+  let motivo = ({ "1": "Arquivada definitivamente", "2": "Extinta", "3": "Baixada" })[String(op).trim()];
+  if (!motivo) {
+    if (String(op).trim() !== "4") { alert("Opção não reconhecida. Nada foi alterado."); return; }
+    const livre = prompt("Descreva o motivo:");
+    if (livre === null || !livre.trim()) return;
+    motivo = "Outro: " + livre.trim();
+  }
+  await marcarEF(casoId, i, "NaoAplica", motivo);
+}
+
+async function marcarEF(casoId, i, situacao, motivo) {
   if ((efsCache[casoId][i].situacao || (efsCache[casoId][i].suspensa ? "Sim" : "")) === situacao) return;
   const x = efsCache[casoId][i];
-  const r = await apiPost("marcarEFs", { casoId: casoId, processos: [x.processo], situacao: situacao });
+  const r = await apiPost("marcarEFs", { casoId: casoId, processos: [x.processo], situacao: situacao, motivo: motivo || "" });
   if (r && r.erro) { alert("Erro: " + r.erro + " (reimplante o Code.gs novo)"); desenharEFs(casoId); return; }
-  x.situacao = situacao; x.suspensa = situacao === "Sim"; x.data = situacao ? hojeIso() : "";
+  x.situacao = situacao; x.suspensa = situacao === "Sim"; x.data = situacao ? hojeIso() : ""; x.motivo = situacao === "NaoAplica" ? (motivo || "") : "";
   await atualizarContagemEFs(casoId);
 }
 
@@ -1464,6 +1497,7 @@ async function atualizarContagemEFs(casoId) {
     c.efTotal = lista.length;
     c.efSuspensas = lista.filter(x => x.situacao === "Sim" || (!x.situacao && x.suspensa)).length;
     c.efPedidos = lista.filter(x => x.situacao === "Pedido").length;
+    c.efNaoAplica = lista.filter(x => x.situacao === "NaoAplica").length;
   }
   renderFicha();
   renderBusca();
@@ -1471,7 +1505,7 @@ async function atualizarContagemEFs(casoId) {
 }
 
 function copiarEFsPendentes(casoId) {
-  const txt = (efsCache[casoId] || []).filter(x => !x.ausente && x.situacao !== "Sim" && !(!x.situacao && x.suspensa)).map(x => x.processo).join("\n");
+  const txt = (efsCache[casoId] || []).filter(x => !x.ausente && x.situacao !== "Sim" && x.situacao !== "NaoAplica" && !(!x.situacao && x.suspensa)).map(x => x.processo).join("\n");
   const msg = document.getElementById("efs-msg");
   navigator.clipboard.writeText(txt).then(() => { if (msg) msg.textContent = "Copiado."; }, () => { if (msg) msg.textContent = "Não foi possível copiar."; });
 }

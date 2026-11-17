@@ -678,11 +678,21 @@ function linhaHab(d, etiqueta) {
   </div>`;
 }
 
+function resumoEFs(s, pd, pe, na) {
+  const resolvido = pd === 0 && pe === 0;
+  const V = "#5a9e2f", L = "#b26a00", R = "#c0392b", C = "#6b7a76";
+  const seg = [`<span style="color:${V}">${s} suspensa${s === 1 ? "" : "s"}</span>`];
+  if (pd) seg.push(`<span style="color:${L}">${pd} com pedido</span>`);
+  if (pe || !resolvido) seg.push(`<span style="color:${R}">${pe} pendente${pe === 1 ? "" : "s"}</span>`);
+  if (na) seg.push(`<span style="color:${C}">${na} não se aplica${na === 1 ? "" : "m"}</span>`);
+  return seg.join(" · ") + (resolvido ? ` <span style="color:${V}">✓</span>` : "");
+}
+
 function sufixoEFs(d) {
   const t = Number(d.efTotal) || 0;
   if (!t) return "";
-  const s = Number(d.efSuspensas) || 0, pd = Number(d.efPedidos) || 0, pe = t - s - pd;
-  return ` (<span style="color:#5a9e2f">${s} suspensa${s === 1 ? "" : "s"}</span>${pd ? ` · <span style="color:#b26a00">${pd} com pedido</span>` : ""} · <span style="color:#c0392b">${pe} pendente${pe === 1 ? "" : "s"}</span>)`;
+  const s = Number(d.efSuspensas) || 0, pd = Number(d.efPedidos) || 0, na = Number(d.efNaoAplica) || 0, pe = t - s - pd - na;
+  return ` (${resumoEFs(s, pd, pe, na)})`;
 }
 
 function linhaHtml(d, etiqueta) {
@@ -712,15 +722,18 @@ const ETAPAS_EF = [
   { v: "Sim", rot: "Suspensa", cor: "#5a9e2f" }
 ];
 function trilhaEF(sit) {
-  const atual = Math.max(0, ETAPAS_EF.findIndex(e => e.v === sit));
-  const cor = ETAPAS_EF[atual].cor;
-  return '<div style="display:flex;align-items:flex-start">' + ETAPAS_EF.map((e, k) => {
+  const naoAp = sit === "NaoAplica";
+  const atual = naoAp ? -1 : Math.max(0, ETAPAS_EF.findIndex(e => e.v === sit));
+  const cor = atual >= 0 ? ETAPAS_EF[atual].cor : "#9aa5a1";
+  const dots = '<div style="display:flex;align-items:flex-start">' + ETAPAS_EF.map((e, k) => {
     const feito = k <= atual;
     const linha = k > 0 ? `<div style="width:26px;height:2px;margin-top:8px;background:${feito ? cor : "#d9dfdd"}"></div>` : "";
     return linha + `<div style="display:flex;flex-direction:column;align-items:center;width:78px">
       <span style="width:18px;height:18px;border-radius:50%;box-sizing:border-box;border:2px solid ${feito ? cor : "#d9dfdd"};background:${feito ? cor : "#fff"};color:#fff;font-size:11px;line-height:14px;text-align:center">${k < atual ? "&#10003;" : ""}</span>
       <span style="font-size:10.5px;margin-top:2px;text-align:center;line-height:1.1;color:${k === atual ? cor : "#6b7a76"};font-weight:${k === atual ? 700 : 400}">${e.rot}</span></div>`;
   }).join("") + "</div>";
+  const chip = `<span style="margin-left:10px;align-self:flex-start;border-radius:12px;padding:2px 9px;font-size:11.5px;border:1.5px solid ${naoAp ? "#6b7a76" : "#d9dfdd"};background:${naoAp ? "#6b7a76" : "#fff"};color:${naoAp ? "#fff" : "#6b7a76"}">Não se aplica</span>`;
+  return `<div style="display:flex;align-items:flex-start">${dots}${chip}</div>`;
 }
 let efsPainelPagina = 50;
 function fecharEFs() { const m = document.getElementById("modal-efs-painel"); if (m) m.remove(); document.removeEventListener("keydown", teclaEFs); }
@@ -753,13 +766,13 @@ function desenharEFsPainel(d, lista) {
     corpo.innerHTML = cab + `<div style="font-size:12.5px;color:#6b7a76">${lista ? "A lista de execuções deste devedor ainda não foi cadastrada." : "Não foi possível carregar a lista (o servidor Code.gs pode estar desatualizado)."}</div></div>${fechar}</div>`;
     return;
   }
-  const s = lista.filter(x => x.situacao === "Sim").length, pd = lista.filter(x => x.situacao === "Pedido").length, pe = lista.length - s - pd;
+  const s = lista.filter(x => x.situacao === "Sim").length, pd = lista.filter(x => x.situacao === "Pedido").length, na = lista.filter(x => x.situacao === "NaoAplica").length, pe = lista.length - s - pd - na;
   const br = x => dataIsoBR(x);
-  corpo.innerHTML = cab + `<div style="font-size:12.5px;color:#6b7a76">${lista.length} execuções · <b style="color:#5a9e2f">${s} suspensas</b> · <b style="color:#b26a00">${pd} com pedido protocolado</b> · <b style="color:#c0392b">${pe} pendentes</b></div></div>${fechar}</div>
+  corpo.innerHTML = cab + `<div style="font-size:12.5px;color:#6b7a76">${lista.length} execuções · ${resumoEFs(s, pd, pe, na)}</div></div>${fechar}</div>
     <div style="border:1px solid #d9dfdd;border-radius:8px;padding:6px 10px">` +
     lista.slice(0, efsPainelPagina).map(x => `<div style="display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 0">
       <span style="font-variant-numeric:tabular-nums;flex:1">${esc(x.processo)}</span>
-      ${x.situacao && x.data ? `<span style="color:#6b7a76;font-size:12px">${x.situacao === "Sim" ? "suspensa" : "pedido"} em ${br(x.data)}</span>` : ""}
+      ${x.situacao && x.situacao !== "NaoAplica" && x.data ? `<span style="color:#6b7a76;font-size:12px">${x.situacao === "Sim" ? "suspensa" : "pedido"} em ${br(x.data)}</span>` : ""}
       ${trilhaEF(x.situacao || "")}</div>`).join("") +
     (lista.length > efsPainelPagina ? `<a href="#" id="efs-mais" style="font-size:13px;color:var(--verde)">Mostrar mais (${lista.length - efsPainelPagina} restantes)</a>` : "") + "</div>";
   const mais = document.getElementById("efs-mais");
