@@ -353,6 +353,7 @@ select:focus { border-color: var(--verde); }
         <div class="form-title">Buscar devedor</div>
         <div class="form-sub">Digite o nome para localizar o caso</div>
         <div class="abas-eixo" id="abas-eixo" role="tablist" aria-label="Filtrar por eixo"></div>
+        <div class="abas-eixo" id="abas-hab" style="display:none;margin-top:-4px"></div>
         <input type="text" id="busca-devedor" placeholder="Ex: Orgal, Panorama..." oninput="listaFocoId=null; renderBusca()">
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-top:8px;cursor:pointer"><input type="checkbox" style="width:auto" onchange="filtroSuspPend=this.checked; listaFocoId=null; renderBusca()"> Só casos com suspensão pendente</label>
         <div id="lista-busca" style="margin-top:12px"></div>
@@ -1719,22 +1720,44 @@ function eixoChave(c) {
 const ABAS_EIXO = [
   { chave: "", rotulo: "Todos" },
   { chave: "ptac", rotulo: "PTAC" },
-  { chave: "falencia", rotulo: "Falência" },
-  { chave: "inventario", rotulo: "Inventário" }
+  { chave: "hab", rotulo: "Habilitações" }
 ];
+const ABAS_HAB = [
+  { chave: "", rotulo: "Todas" },
+  { chave: "inventario", rotulo: "Inventário" },
+  { chave: "falencia", rotulo: "Falência" }
+];
+let filtroHabSub = "";
+const ehHabEixo = c => eixoChave(c) !== "ptac"; // Falencia e Inventario = habilitacoes (so criterio de classificacao)
 function escolherAbaEixo(chave) {
   filtroEixoAndamento = chave;
+  if (chave !== "hab") filtroHabSub = "";
+  listaFocoId = null;
+  renderBusca();
+}
+function escolherSubHab(chave) {
+  filtroHabSub = chave;
   listaFocoId = null;
   renderBusca();
 }
 function renderAbasEixo() {
   const alvo = document.getElementById("abas-eixo");
   if (!alvo) return;
+  const contar = ch => ch === "" ? casos.length : (ch === "ptac" ? casos.filter(c => eixoChave(c) === "ptac").length : casos.filter(ehHabEixo).length);
   alvo.innerHTML = ABAS_EIXO.map(a => {
-    const n = a.chave ? casos.filter(c => eixoChave(c) === a.chave).length : casos.length;
     const ativa = filtroEixoAndamento === a.chave;
-    return `<button type="button" class="aba-eixo${ativa ? " ativa" : ""}" role="tab" aria-selected="${ativa}" onclick="escolherAbaEixo('${a.chave}')">${a.rotulo}<span class="qtd">${n}</span></button>`;
+    return `<button type="button" class="aba-eixo${ativa ? " ativa" : ""}" role="tab" aria-selected="${ativa}" onclick="escolherAbaEixo('${a.chave}')">${a.rotulo}<span class="qtd">${contar(a.chave)}</span></button>`;
   }).join("");
+  const sub = document.getElementById("abas-hab");
+  if (sub) {
+    if (filtroEixoAndamento !== "hab") { sub.innerHTML = ""; sub.style.display = "none"; return; }
+    sub.style.display = "flex";
+    sub.innerHTML = ABAS_HAB.map(a => {
+      const n = a.chave ? casos.filter(c => eixoChave(c) === a.chave).length : casos.filter(ehHabEixo).length;
+      const ativa = filtroHabSub === a.chave;
+      return `<button type="button" class="aba-eixo${ativa ? " ativa" : ""}" style="padding:5px 12px;font-size:13px" onclick="escolherSubHab('${a.chave}')">${a.rotulo}<span class="qtd">${n}</span></button>`;
+    }).join("");
+  }
 }
 
 function renderBusca() {
@@ -1744,7 +1767,8 @@ function renderBusca() {
 
   let visiveis = casos.filter(c => c.Devedor.toLowerCase().includes(termo));
   renderAbasEixo();
-  if (filtroEixoAndamento) visiveis = visiveis.filter(c => eixoChave(c) === filtroEixoAndamento);
+  if (filtroEixoAndamento === "ptac") visiveis = visiveis.filter(c => eixoChave(c) === "ptac");
+  else if (filtroEixoAndamento === "hab") visiveis = visiveis.filter(c => ehHabEixo(c) && (!filtroHabSub || eixoChave(c) === filtroHabSub));
   if (filtroSuspPend) visiveis = visiveis.filter(c => casoComSuspensao(c) && efPendentes(c) > 0);
   visiveis = [...visiveis].sort((a, b) => saldoCaso(b) - saldoCaso(a));
 
@@ -1920,7 +1944,7 @@ async function renderFicha() {
   });
   tracker += "</div>";
 
-  const podeEncaminharPtac = fase === "Triagem";
+  const podeEncaminharPtac = fase === "Triagem" || eixoChave(c) !== "ptac"; // falencia/inventario (incl. em analise, habilitacao) podem ser encaminhados ao PTAC
 
   wrap.innerHTML = `
     <div class="form-card">
